@@ -116,6 +116,10 @@ sealed class HostEventDto with _$HostEventDto {
   }) = HostEventDto_Status;
   const factory HostEventDto.permission(PermissionReqDto field0) =
       HostEventDto_Permission;
+  const factory HostEventDto.permissionResolved({
+    required String session,
+    required String id,
+  }) = HostEventDto_PermissionResolved;
   const factory HostEventDto.disconnected() = HostEventDto_Disconnected;
 }
 

@@ -23,6 +23,7 @@ mixin _$HostEventDto {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -31,6 +32,7 @@ mixin _$HostEventDto {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -39,6 +41,7 @@ mixin _$HostEventDto {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
@@ -48,6 +51,8 @@ mixin _$HostEventDto {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -56,6 +61,8 @@ mixin _$HostEventDto {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -64,6 +71,7 @@ mixin _$HostEventDto {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
@@ -177,6 +185,7 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) {
     return sessions(field0);
@@ -189,6 +198,7 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) {
     return sessions?.call(field0);
@@ -201,6 +211,7 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -217,6 +228,8 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return sessions(this);
@@ -229,6 +242,8 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return sessions?.call(this);
@@ -241,6 +256,7 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -342,6 +358,7 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) {
     return update(field0);
@@ -354,6 +371,7 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) {
     return update?.call(field0);
@@ -366,6 +384,7 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -382,6 +401,8 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return update(this);
@@ -394,6 +415,8 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return update?.call(this);
@@ -406,6 +429,7 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -517,6 +541,7 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) {
     return status(session, running);
@@ -529,6 +554,7 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) {
     return status?.call(session, running);
@@ -541,6 +567,7 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -557,6 +584,8 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return status(this);
@@ -569,6 +598,8 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return status?.call(this);
@@ -581,6 +612,7 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -685,6 +717,7 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) {
     return permission(field0);
@@ -697,6 +730,7 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) {
     return permission?.call(field0);
@@ -709,6 +743,7 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -725,6 +760,8 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return permission(this);
@@ -737,6 +774,8 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return permission?.call(this);
@@ -749,6 +788,7 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -770,6 +810,198 @@ abstract class HostEventDto_Permission extends HostEventDto {
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$HostEventDto_PermissionImplCopyWith<_$HostEventDto_PermissionImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HostEventDto_PermissionResolvedImplCopyWith<$Res> {
+  factory _$$HostEventDto_PermissionResolvedImplCopyWith(
+    _$HostEventDto_PermissionResolvedImpl value,
+    $Res Function(_$HostEventDto_PermissionResolvedImpl) then,
+  ) = __$$HostEventDto_PermissionResolvedImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String session, String id});
+}
+
+/// @nodoc
+class __$$HostEventDto_PermissionResolvedImplCopyWithImpl<$Res>
+    extends
+        _$HostEventDtoCopyWithImpl<$Res, _$HostEventDto_PermissionResolvedImpl>
+    implements _$$HostEventDto_PermissionResolvedImplCopyWith<$Res> {
+  __$$HostEventDto_PermissionResolvedImplCopyWithImpl(
+    _$HostEventDto_PermissionResolvedImpl _value,
+    $Res Function(_$HostEventDto_PermissionResolvedImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? session = null, Object? id = null}) {
+    return _then(
+      _$HostEventDto_PermissionResolvedImpl(
+        session: null == session
+            ? _value.session
+            : session // ignore: cast_nullable_to_non_nullable
+                  as String,
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$HostEventDto_PermissionResolvedImpl
+    extends HostEventDto_PermissionResolved {
+  const _$HostEventDto_PermissionResolvedImpl({
+    required this.session,
+    required this.id,
+  }) : super._();
+
+  @override
+  final String session;
+  @override
+  final String id;
+
+  @override
+  String toString() {
+    return 'HostEventDto.permissionResolved(session: $session, id: $id)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HostEventDto_PermissionResolvedImpl &&
+            (identical(other.session, session) || other.session == session) &&
+            (identical(other.id, id) || other.id == id));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, session, id);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HostEventDto_PermissionResolvedImplCopyWith<
+    _$HostEventDto_PermissionResolvedImpl
+  >
+  get copyWith =>
+      __$$HostEventDto_PermissionResolvedImplCopyWithImpl<
+        _$HostEventDto_PermissionResolvedImpl
+      >(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(List<SessionMetaDto> field0) sessions,
+    required TResult Function(UpdateDto field0) update,
+    required TResult Function(String session, bool running) status,
+    required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
+    required TResult Function() disconnected,
+  }) {
+    return permissionResolved(session, id);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(List<SessionMetaDto> field0)? sessions,
+    TResult? Function(UpdateDto field0)? update,
+    TResult? Function(String session, bool running)? status,
+    TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function()? disconnected,
+  }) {
+    return permissionResolved?.call(session, id);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(List<SessionMetaDto> field0)? sessions,
+    TResult Function(UpdateDto field0)? update,
+    TResult Function(String session, bool running)? status,
+    TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
+    TResult Function()? disconnected,
+    required TResult orElse(),
+  }) {
+    if (permissionResolved != null) {
+      return permissionResolved(session, id);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HostEventDto_Sessions value) sessions,
+    required TResult Function(HostEventDto_Update value) update,
+    required TResult Function(HostEventDto_Status value) status,
+    required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
+    required TResult Function(HostEventDto_Disconnected value) disconnected,
+  }) {
+    return permissionResolved(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HostEventDto_Sessions value)? sessions,
+    TResult? Function(HostEventDto_Update value)? update,
+    TResult? Function(HostEventDto_Status value)? status,
+    TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
+    TResult? Function(HostEventDto_Disconnected value)? disconnected,
+  }) {
+    return permissionResolved?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HostEventDto_Sessions value)? sessions,
+    TResult Function(HostEventDto_Update value)? update,
+    TResult Function(HostEventDto_Status value)? status,
+    TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Disconnected value)? disconnected,
+    required TResult orElse(),
+  }) {
+    if (permissionResolved != null) {
+      return permissionResolved(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HostEventDto_PermissionResolved extends HostEventDto {
+  const factory HostEventDto_PermissionResolved({
+    required final String session,
+    required final String id,
+  }) = _$HostEventDto_PermissionResolvedImpl;
+  const HostEventDto_PermissionResolved._() : super._();
+
+  String get session;
+  String get id;
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HostEventDto_PermissionResolvedImplCopyWith<
+    _$HostEventDto_PermissionResolvedImpl
+  >
   get copyWith => throw _privateConstructorUsedError;
 }
 
@@ -821,6 +1053,7 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     required TResult Function(UpdateDto field0) update,
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
     required TResult Function() disconnected,
   }) {
     return disconnected();
@@ -833,6 +1066,7 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult? Function(UpdateDto field0)? update,
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
     TResult? Function()? disconnected,
   }) {
     return disconnected?.call();
@@ -845,6 +1079,7 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult Function(UpdateDto field0)? update,
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -861,6 +1096,8 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     required TResult Function(HostEventDto_Update value) update,
     required TResult Function(HostEventDto_Status value) status,
     required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return disconnected(this);
@@ -873,6 +1110,8 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult? Function(HostEventDto_Update value)? update,
     TResult? Function(HostEventDto_Status value)? status,
     TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return disconnected?.call(this);
@@ -885,6 +1124,7 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult Function(HostEventDto_Update value)? update,
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {

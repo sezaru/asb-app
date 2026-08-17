@@ -75,6 +75,9 @@ class _HostPageState extends State<HostPage> {
           _bucket(session).running = running;
         case HostEventDto_Permission(:final field0):
           _bucket(field0.session).pending = field0;
+        case HostEventDto_PermissionResolved(:final session, :final id):
+          final b = _bucket(session);
+          if (b.pending?.id == id) b.pending = null;
         case HostEventDto_Disconnected():
           _status = 'disconnected';
       }
@@ -167,7 +170,7 @@ class _SessionCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(8),
-            child: _InputBar(onSend: onSend),
+            child: _InputBar(onSend: onSend, enabled: !state.running),
           ),
         ],
       ),
@@ -324,7 +327,11 @@ class _PermissionBar extends StatelessWidget {
 
 class _InputBar extends StatefulWidget {
   final void Function(String) onSend;
-  const _InputBar({required this.onSend});
+
+  /// The sidecar rejects prompts unless the session is idle, so grey the bar
+  /// out while it's running rather than let a tap silently drop.
+  final bool enabled;
+  const _InputBar({required this.onSend, required this.enabled});
 
   @override
   State<_InputBar> createState() => _InputBarState();
@@ -351,14 +358,20 @@ class _InputBarState extends State<_InputBar> {
         Expanded(
           child: TextField(
             controller: _controller,
-            decoration: const InputDecoration(
-              hintText: 'Send a prompt or /command…',
+            enabled: widget.enabled,
+            decoration: InputDecoration(
+              hintText: widget.enabled
+                  ? 'Send a prompt or /command…'
+                  : 'Busy — wait for idle to send…',
               isDense: true,
             ),
-            onSubmitted: (_) => _submit(),
+            onSubmitted: widget.enabled ? (_) => _submit() : null,
           ),
         ),
-        IconButton(icon: const Icon(Icons.send), onPressed: _submit),
+        IconButton(
+          icon: const Icon(Icons.send),
+          onPressed: widget.enabled ? _submit : null,
+        ),
       ],
     );
   }

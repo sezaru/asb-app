@@ -159,6 +159,7 @@ pub enum HostEventDto {
     Update(UpdateDto),
     Status { session: String, running: bool },
     Permission(PermissionReqDto),
+    PermissionResolved { session: String, id: String },
     Disconnected,
 }
 
@@ -257,6 +258,9 @@ fn map_event(m: WireMsg) -> HostEventDto {
                 })
                 .collect(),
         }),
+        WireMsg::PermissionResolved { session, id } => {
+            HostEventDto::PermissionResolved { session, id }
+        }
         // phone -> host variants never arrive here.
         _ => HostEventDto::Disconnected,
     }

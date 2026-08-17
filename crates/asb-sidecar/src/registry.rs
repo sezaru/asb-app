@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -14,6 +14,9 @@ use tokio::sync::broadcast;
 pub struct Registry {
     dir: PathBuf,
     sessions: Mutex<HashMap<SessionId, SessionEntry>>,
+    /// Permission requests still awaiting an answer, keyed `(session, id)`. The
+    /// first device to answer removes the entry; later duplicates are ignored.
+    pending_perms: Mutex<HashSet<(SessionId, String)>>,
     tx: broadcast::Sender<WireMsg>,
 }
 
@@ -22,6 +25,10 @@ struct SessionEntry {
     title: String,
     state: SessionState,
     turn: TurnId,
+    /// Optimistically set the instant a phone prompt is accepted, before Emacs
+    /// reports Running, so a second prompt racing within the same RTT loses.
+    /// Cleared by the next Status from Emacs (which is then authoritative).
+    input_claimed: bool,
 }
 
 impl Registry {
@@ -30,12 +37,43 @@ impl Registry {
         Self {
             dir,
             sessions: Mutex::new(HashMap::new()),
+            pending_perms: Mutex::new(HashSet::new()),
             tx,
+        }
+    }
+
+    /// Mark a permission answered. Returns true only for the FIRST caller of a
+    /// given `(session, id)`; later duplicates (a second device that raced the
+    /// resolve broadcast) return false and should be dropped.
+    pub fn resolve_permission(&self, session: &str, id: &str) -> bool {
+        self.pending_perms
+            .lock()
+            .unwrap()
+            .remove(&(session.to_string(), id.to_string()))
+    }
+
+    /// Reserve a session's input slot for one prompt. Returns true only when the
+    /// session is idle AND unclaimed, so the loser of a sub-RTT race (both
+    /// devices send while idle, before Emacs reports Running) gets false. The
+    /// claim is released by the next Status from Emacs.
+    pub fn try_claim_input(&self, session: &str) -> bool {
+        let mut sessions = self.sessions.lock().unwrap();
+        match sessions.get_mut(session) {
+            Some(e) if e.state == SessionState::Idle && !e.input_claimed => {
+                e.input_claimed = true;
+                true
+            }
+            _ => false,
         }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<WireMsg> {
         self.tx.subscribe()
+    }
+
+    /// Publish a host->phone message to every connected phone.
+    pub fn broadcast(&self, m: WireMsg) {
+        let _ = self.tx.send(m);
     }
 
     pub async fn handle_emacs(&self, msg: EmacsIn) -> anyhow::Result<()> {
@@ -51,6 +89,7 @@ impl Registry {
                             title,
                             state: SessionState::Idle,
                             turn: 0,
+                            input_claimed: false,
                         },
                     );
                 }
@@ -77,6 +116,7 @@ impl Registry {
                     entry.turn += 1;
                 }
                 entry.state = state;
+                entry.input_claimed = false;
                 let _ = self.tx.send(WireMsg::Status { session, state });
             }
             EmacsIn::Permission {
@@ -85,6 +125,10 @@ impl Registry {
                 command,
                 options,
             } => {
+                self.pending_perms
+                    .lock()
+                    .unwrap()
+                    .insert((session.clone(), id.clone()));
                 let _ = self.tx.send(WireMsg::PermissionReq {
                     session,
                     id,
@@ -94,6 +138,7 @@ impl Registry {
             }
             EmacsIn::SessionClose { session } => {
                 sessions.remove(&session);
+                self.pending_perms.lock().unwrap().retain(|(s, _)| s != &session);
             }
         }
         Ok(())
@@ -169,6 +214,26 @@ mod tests {
             other => panic!("expected Update, got {other:?}"),
         }
         assert_eq!(reg.last_seq("s"), 1);
+    }
+
+    #[tokio::test]
+    async fn permission_resolves_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        reg.handle_emacs(EmacsIn::Permission {
+            session: "s".into(),
+            id: "p1".into(),
+            command: "rm -rf".into(),
+            options: vec![],
+        })
+        .await
+        .unwrap();
+
+        // unknown ids are never "first"
+        assert!(!reg.resolve_permission("s", "nope"));
+        // first answer wins, second (raced) duplicate is dropped
+        assert!(reg.resolve_permission("s", "p1"));
+        assert!(!reg.resolve_permission("s", "p1"));
     }
 
     #[tokio::test]

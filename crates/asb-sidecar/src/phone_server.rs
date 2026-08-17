@@ -50,7 +50,9 @@ pub fn spawn_phone_server(
             let presence = presence.clone();
             tokio::spawn(async move {
                 let _guard = presence.enter();
-                let _ = handle_phone_conn(conn, reg, out_tx).await;
+                if let Err(e) = handle_phone_conn(conn, reg, out_tx).await {
+                    tracing::warn!("phone conn ended: {e:#}");
+                }
             });
         }
     })
@@ -105,26 +107,66 @@ async fn handle_phone_conn(
                         send_wire(&mut send, &WireMsg::Update(u)).await?;
                     }
                 }
-                Ok(other) => send_wire(&mut send, &other).await?,
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => break,
+                Ok(other) => {
+                    if let Err(e) = send_wire(&mut send, &other).await {
+                        tracing::warn!("send_wire failed for {other:?}: {e:#}");
+                        return Err(e);
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!("phone broadcast lagged by {n}");
+                    continue;
+                }
+                Err(e) => {
+                    tracing::warn!("phone broadcast closed: {e}");
+                    break;
+                }
             },
             r = recv_frame(&mut recv) => match r {
                 Ok(body) => {
                     if let Ok(m) = ciborium::from_reader::<WireMsg, _>(&body[..]) {
-                        handle_inbound(m, &out_tx).await;
+                        handle_inbound(m, &reg, &out_tx).await;
                     }
                 }
-                Err(_) => break,
+                Err(e) => {
+                    tracing::warn!("phone recv_frame ended: {e}");
+                    break;
+                }
             },
         }
     }
     Ok(())
 }
 
-async fn handle_inbound(m: WireMsg, out_tx: &mpsc::Sender<EmacsOut>) {
+async fn handle_inbound(m: WireMsg, reg: &Arc<Registry>, out_tx: &mpsc::Sender<EmacsOut>) {
+    // A phone answered. Resolution is idempotent: only the first device to
+    // answer a given (session,id) is honored -- a second device that raced the
+    // resolve broadcast is dropped, so Emacs never gets two responses. On the
+    // winning answer, clear the prompt on every other connected phone.
+    if let WireMsg::PermissionRes { session, id, .. } = &m {
+        if !reg.resolve_permission(session, id) {
+            tracing::info!("dropping duplicate permission answer for {session}/{id}");
+            return;
+        }
+        reg.broadcast(WireMsg::PermissionResolved {
+            session: session.clone(),
+            id: id.clone(),
+        });
+    }
     let ev = match m {
-        WireMsg::Input { session, text } => Some(EmacsOut::Inject { session, text }),
+        // A prompt is only accepted when the agent's input is available (session
+        // idle) and no other prompt has claimed the slot this instant. If the
+        // LLM is mid-turn -- or another device just won the sub-RTT race -- we
+        // reject it, so only one prompt lands per idle window. (Interrupt is NOT
+        // gated -- stopping a running turn must always get through.)
+        WireMsg::Input { session, text } => {
+            if reg.try_claim_input(&session) {
+                Some(EmacsOut::Inject { session, text })
+            } else {
+                tracing::info!("rejecting input for busy/claimed/unknown session {session}");
+                None
+            }
+        }
         WireMsg::PermissionRes {
             session,
             id,
@@ -294,6 +336,14 @@ mod tests {
             })
             .await
             .unwrap();
+        // Turn complete -> idle, so the phone's follow-up prompt is accepted.
+        p.reg
+            .handle_emacs(EmacsIn::Status {
+                session: "s".into(),
+                state: SessionState::Idle,
+            })
+            .await
+            .unwrap();
 
         let mut client = PhoneClient::connect(&p.phone_ep, p.host_addr.clone())
             .await
@@ -315,6 +365,210 @@ mod tests {
             .unwrap();
         match ev {
             EmacsOut::Inject { text, .. } => assert_eq!(text, "run it again"),
+            other => panic!("expected Inject, got {other:?}"),
+        }
+
+        p.host_ep.close().await;
+        p.phone_ep.close().await;
+    }
+
+    #[tokio::test]
+    async fn duplicate_permission_answer_is_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = setup(dir.path(), None).await;
+        let (out_tx, mut out_rx) = mpsc::channel(16);
+        let _srv = spawn_phone_server(
+            p.host_ep.clone(),
+            p.reg.clone(),
+            p.roster.clone(),
+            out_tx,
+            p.presence.clone(),
+        );
+
+        p.reg
+            .handle_emacs(EmacsIn::SessionOpen {
+                session: "s".into(),
+                title: "demo".into(),
+            })
+            .await
+            .unwrap();
+        p.reg
+            .handle_emacs(EmacsIn::Permission {
+                session: "s".into(),
+                id: "p1".into(),
+                command: "rm -rf".into(),
+                options: vec![],
+            })
+            .await
+            .unwrap();
+
+        let mut client = PhoneClient::connect(&p.phone_ep, p.host_addr.clone())
+            .await
+            .unwrap();
+        client.hello(None, HashMap::new()).await.unwrap();
+
+        // Two devices race to answer the same (session,id) before the resolve
+        // broadcast reaches the loser -- both answers reach the sidecar.
+        client.permission("s", "p1", "approve").await.unwrap();
+        client.permission("s", "p1", "approve").await.unwrap();
+
+        // Emacs sees exactly one response...
+        let ev = tokio::time::timeout(Duration::from_secs(5), out_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        match ev {
+            EmacsOut::PermissionResponse { id, option, .. } => {
+                assert_eq!(id, "p1");
+                assert_eq!(option, "approve");
+            }
+            other => panic!("expected PermissionResponse, got {other:?}"),
+        }
+        // ...the duplicate is dropped.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(500), out_rx.recv())
+                .await
+                .is_err(),
+            "duplicate permission answer should have been dropped"
+        );
+
+        p.host_ep.close().await;
+        p.phone_ep.close().await;
+    }
+
+    #[tokio::test]
+    async fn input_rejected_while_running() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = setup(dir.path(), None).await;
+        let (out_tx, mut out_rx) = mpsc::channel(16);
+        let _srv = spawn_phone_server(
+            p.host_ep.clone(),
+            p.reg.clone(),
+            p.roster.clone(),
+            out_tx,
+            p.presence.clone(),
+        );
+
+        p.reg
+            .handle_emacs(EmacsIn::SessionOpen {
+                session: "s".into(),
+                title: "demo".into(),
+            })
+            .await
+            .unwrap();
+        p.reg
+            .handle_emacs(EmacsIn::Status {
+                session: "s".into(),
+                state: SessionState::Running,
+            })
+            .await
+            .unwrap();
+
+        let mut client = PhoneClient::connect(&p.phone_ep, p.host_addr.clone())
+            .await
+            .unwrap();
+        client.hello(None, HashMap::new()).await.unwrap();
+
+        // LLM is running -> the prompt is rejected (no EmacsOut).
+        client.input("s", "while busy").await.unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(500), out_rx.recv())
+                .await
+                .is_err(),
+            "input while running should be rejected"
+        );
+
+        // Once idle, the same phone's prompt is accepted.
+        p.reg
+            .handle_emacs(EmacsIn::Status {
+                session: "s".into(),
+                state: SessionState::Idle,
+            })
+            .await
+            .unwrap();
+        client.input("s", "now idle").await.unwrap();
+        let ev = tokio::time::timeout(Duration::from_secs(5), out_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        match ev {
+            EmacsOut::Inject { text, .. } => assert_eq!(text, "now idle"),
+            other => panic!("expected Inject, got {other:?}"),
+        }
+
+        p.host_ep.close().await;
+        p.phone_ep.close().await;
+    }
+
+    #[tokio::test]
+    async fn idle_race_only_first_input_wins() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = setup(dir.path(), None).await;
+        let (out_tx, mut out_rx) = mpsc::channel(16);
+        let _srv = spawn_phone_server(
+            p.host_ep.clone(),
+            p.reg.clone(),
+            p.roster.clone(),
+            out_tx,
+            p.presence.clone(),
+        );
+
+        // Session opens idle; Emacs has NOT reported Running yet.
+        p.reg
+            .handle_emacs(EmacsIn::SessionOpen {
+                session: "s".into(),
+                title: "demo".into(),
+            })
+            .await
+            .unwrap();
+
+        let mut client = PhoneClient::connect(&p.phone_ep, p.host_addr.clone())
+            .await
+            .unwrap();
+        client.hello(None, HashMap::new()).await.unwrap();
+
+        // Two prompts race within the same RTT, both while the session still
+        // reads idle -- only the first claims the slot.
+        client.input("s", "first").await.unwrap();
+        client.input("s", "second").await.unwrap();
+
+        let ev = tokio::time::timeout(Duration::from_secs(5), out_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        match ev {
+            EmacsOut::Inject { text, .. } => assert_eq!(text, "first"),
+            other => panic!("expected Inject, got {other:?}"),
+        }
+        assert!(
+            tokio::time::timeout(Duration::from_millis(500), out_rx.recv())
+                .await
+                .is_err(),
+            "second racing prompt should have been dropped"
+        );
+
+        // Emacs runs the turn and returns to idle -> the claim is released.
+        p.reg
+            .handle_emacs(EmacsIn::Status {
+                session: "s".into(),
+                state: SessionState::Running,
+            })
+            .await
+            .unwrap();
+        p.reg
+            .handle_emacs(EmacsIn::Status {
+                session: "s".into(),
+                state: SessionState::Idle,
+            })
+            .await
+            .unwrap();
+        client.input("s", "third").await.unwrap();
+        let ev = tokio::time::timeout(Duration::from_secs(5), out_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        match ev {
+            EmacsOut::Inject { text, .. } => assert_eq!(text, "third"),
             other => panic!("expected Inject, got {other:?}"),
         }
 

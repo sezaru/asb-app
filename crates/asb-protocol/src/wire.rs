@@ -50,6 +50,12 @@ pub enum WireMsg {
         command: String,
         options: Vec<PermOption>,
     },
+    /// A pending permission was answered (by any phone or by Emacs); every phone
+    /// clears its prompt so a second device can't answer a resolved request.
+    PermissionResolved {
+        session: SessionId,
+        id: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -793,6 +793,14 @@ impl SseDecode for crate::api::client::HostEventDto {
                 return crate::api::client::HostEventDto::Permission(var_field0);
             }
             4 => {
+                let mut var_session = <String>::sse_decode(deserializer);
+                let mut var_id = <String>::sse_decode(deserializer);
+                return crate::api::client::HostEventDto::PermissionResolved {
+                    session: var_session,
+                    id: var_id,
+                };
+            }
+            5 => {
                 return crate::api::client::HostEventDto::Disconnected;
             }
             _ => {
@@ -1190,7 +1198,13 @@ impl flutter_rust_bridge::IntoDart for crate::api::client::HostEventDto {
             crate::api::client::HostEventDto::Permission(field0) => {
                 [3.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
-            crate::api::client::HostEventDto::Disconnected => [4.into_dart()].into_dart(),
+            crate::api::client::HostEventDto::PermissionResolved { session, id } => [
+                4.into_dart(),
+                session.into_into_dart().into_dart(),
+                id.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::client::HostEventDto::Disconnected => [5.into_dart()].into_dart(),
             _ => {
                 unimplemented!("");
             }
@@ -1470,8 +1484,13 @@ impl SseEncode for crate::api::client::HostEventDto {
                 <i32>::sse_encode(3, serializer);
                 <crate::api::client::PermissionReqDto>::sse_encode(field0, serializer);
             }
-            crate::api::client::HostEventDto::Disconnected => {
+            crate::api::client::HostEventDto::PermissionResolved { session, id } => {
                 <i32>::sse_encode(4, serializer);
+                <String>::sse_encode(session, serializer);
+                <String>::sse_encode(id, serializer);
+            }
+            crate::api::client::HostEventDto::Disconnected => {
+                <i32>::sse_encode(5, serializer);
             }
             _ => {
                 unimplemented!("");

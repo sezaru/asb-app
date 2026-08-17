@@ -710,6 +710,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           dco_decode_box_autoadd_permission_req_dto(raw[1]),
         );
       case 4:
+        return HostEventDto_PermissionResolved(
+          session: dco_decode_String(raw[1]),
+          id: dco_decode_String(raw[2]),
+        );
+      case 5:
         return HostEventDto_Disconnected();
       default:
         throw Exception("unreachable");
@@ -1033,6 +1038,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         );
         return HostEventDto_Permission(var_field0);
       case 4:
+        var var_session = sse_decode_String(deserializer);
+        var var_id = sse_decode_String(deserializer);
+        return HostEventDto_PermissionResolved(
+          session: var_session,
+          id: var_id,
+        );
+      case 5:
         return HostEventDto_Disconnected();
       default:
         throw UnimplementedError('');
@@ -1425,8 +1437,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case HostEventDto_Permission(field0: final field0):
         sse_encode_i_32(3, serializer);
         sse_encode_box_autoadd_permission_req_dto(field0, serializer);
-      case HostEventDto_Disconnected():
+      case HostEventDto_PermissionResolved(
+        session: final session,
+        id: final id,
+      ):
         sse_encode_i_32(4, serializer);
+        sse_encode_String(session, serializer);
+        sse_encode_String(id, serializer);
+      case HostEventDto_Disconnected():
+        sse_encode_i_32(5, serializer);
     }
   }
 
