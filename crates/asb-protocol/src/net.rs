@@ -1,4 +1,6 @@
+use anyhow::Context;
 use iroh::endpoint::presets;
+use iroh::endpoint::{RecvStream, SendStream};
 use iroh::{Endpoint, SecretKey};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -22,6 +24,30 @@ pub async fn build_endpoint(secret_32: [u8; 32]) -> anyhow::Result<Endpoint> {
     Ok(endpoint)
 }
 
+/// A `Minimal`-preset endpoint (no pkarr/DNS/relay): reachable only via a
+/// directly-supplied address. Used by loopback tests and future LAN-only paths.
+pub async fn build_endpoint_minimal(secret_32: [u8; 32]) -> anyhow::Result<Endpoint> {
+    let secret = SecretKey::from_bytes(&secret_32);
+    let endpoint = Endpoint::builder(presets::Minimal)
+        .secret_key(secret)
+        .alpns(vec![ASB_ALPN.to_vec(), PAIR_ALPN.to_vec()])
+        .bind()
+        .await?;
+    Ok(endpoint)
+}
+
+/// Snapshot a dialable address, waiting (bounded) for a direct one to appear.
+pub async fn ready_addr(endpoint: &Endpoint) -> iroh::EndpointAddr {
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    while tokio::time::Instant::now() < deadline {
+        if endpoint.addr().ip_addrs().next().is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    endpoint.addr()
+}
+
 /// 4-byte big-endian length prefix + body.
 pub async fn write_frame<W: AsyncWrite + Unpin>(w: &mut W, body: &[u8]) -> anyhow::Result<()> {
     anyhow::ensure!(body.len() <= MAX_FRAME, "frame too large: {}", body.len());
@@ -38,6 +64,28 @@ pub async fn read_frame<R: AsyncRead + Unpin>(r: &mut R) -> anyhow::Result<Vec<u
     anyhow::ensure!(n <= MAX_FRAME, "frame too large: {n}");
     let mut body = vec![0u8; n];
     r.read_exact(&mut body).await?;
+    Ok(body)
+}
+
+/// Same 4-byte-BE framing, over an iroh (quinn) bidirectional stream. iroh
+/// streams expose inherent `write_all`/`read_exact`, not the tokio traits, so
+/// these can't share the generic helpers above.
+pub async fn send_frame(send: &mut SendStream, body: &[u8]) -> anyhow::Result<()> {
+    anyhow::ensure!(body.len() <= MAX_FRAME, "frame too large: {}", body.len());
+    send.write_all(&(body.len() as u32).to_be_bytes())
+        .await
+        .context("write frame len")?;
+    send.write_all(body).await.context("write frame body")?;
+    Ok(())
+}
+
+pub async fn recv_frame(recv: &mut RecvStream) -> anyhow::Result<Vec<u8>> {
+    let mut len = [0u8; 4];
+    recv.read_exact(&mut len).await.context("read frame len")?;
+    let n = u32::from_be_bytes(len) as usize;
+    anyhow::ensure!(n <= MAX_FRAME, "frame too large: {n}");
+    let mut body = vec![0u8; n];
+    recv.read_exact(&mut body).await.context("read frame body")?;
     Ok(body)
 }
 
