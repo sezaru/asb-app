@@ -1,0 +1,9 @@
+# Read by `flutter_rust_bridge_codegen generate` when run from this directory.
+#
+# Regenerate after ANY change under rust/src/api. The generated Dart in
+# lib/src/rust and the generated Rust in rust/src/frb_generated.rs are committed
+# so a clean checkout builds without the codegen binary — but that only holds if
+# they are kept in step with the sources by hand.
+rust_input: crate::api
+rust_root: rust/
+dart_output: lib/src/rust

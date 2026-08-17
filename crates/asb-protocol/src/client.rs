@@ -2,6 +2,7 @@
 //! the Flutter Rust core via flutter_rust_bridge.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use iroh::endpoint::{Connection, RecvStream, SendStream};
@@ -83,6 +84,24 @@ impl PhoneClient {
         .await
     }
 
+    /// Split into independent send/receive halves sharing the connection, so a
+    /// receive loop and outbound sends run in separate tasks. A `select!` over
+    /// one stream's read + write would cancel a half-read frame and corrupt it;
+    /// two owners never do.
+    pub fn split(self) -> (PhoneSender, PhoneReceiver) {
+        let conn = Arc::new(self._conn);
+        (
+            PhoneSender {
+                _conn: conn.clone(),
+                send: self.send,
+            },
+            PhoneReceiver {
+                _conn: conn,
+                recv: self.recv,
+            },
+        )
+    }
+
     /// Read messages until the next `Update` arrives or `d` elapses.
     pub async fn next_update_timeout(&mut self, d: Duration) -> anyhow::Result<Update> {
         let deadline = tokio::time::Instant::now() + d;
@@ -96,5 +115,69 @@ impl PhoneClient {
                 return Ok(u);
             }
         }
+    }
+}
+
+/// The outbound half of a [`PhoneClient`]. Cheap to hold behind a mutex — every
+/// method writes one frame and returns.
+pub struct PhoneSender {
+    _conn: Arc<Connection>,
+    send: SendStream,
+}
+
+impl PhoneSender {
+    async fn send_msg(&mut self, m: &WireMsg) -> anyhow::Result<()> {
+        let mut buf = Vec::new();
+        ciborium::into_writer(m, &mut buf)?;
+        send_frame(&mut self.send, &buf).await
+    }
+
+    pub async fn hello(
+        &mut self,
+        fcm_token: Option<String>,
+        last_seq: HashMap<SessionId, Seq>,
+    ) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::Hello {
+            fcm_token,
+            last_seq,
+        })
+        .await
+    }
+
+    pub async fn input(&mut self, session: &str, text: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::Input {
+            session: session.into(),
+            text: text.into(),
+        })
+        .await
+    }
+
+    pub async fn permission(&mut self, session: &str, id: &str, option: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::PermissionRes {
+            session: session.into(),
+            id: id.into(),
+            option: option.into(),
+        })
+        .await
+    }
+
+    pub async fn interrupt(&mut self, session: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::Interrupt {
+            session: session.into(),
+        })
+        .await
+    }
+}
+
+/// The inbound half of a [`PhoneClient`]. Owned by a single receive loop.
+pub struct PhoneReceiver {
+    _conn: Arc<Connection>,
+    recv: RecvStream,
+}
+
+impl PhoneReceiver {
+    pub async fn next_msg(&mut self) -> anyhow::Result<WireMsg> {
+        let body = recv_frame(&mut self.recv).await?;
+        Ok(ciborium::from_reader(&body[..])?)
     }
 }

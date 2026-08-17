@@ -1,0 +1,88 @@
+// Builds rust/ for each Android ABI and drops the results where the Android
+// Gradle plugin picks them up (src/main/jniLibs/<abi>/libasb_client.so).
+//
+// Not cargokit (the flutter_rust_bridge template's build system): cargokit
+// manages the Rust toolchain through rustup and installs targets with `rustup
+// target add`. There is no rustup here — the toolchain comes from the nix flake
+// (fenix, with the three Android rust-std's combined in), pinned so the build
+// box and the laptop cannot drift. cargo-ndk does the one genuinely fiddly part
+// (pointing CC/AR/linker at the NDK's clang per target) and nothing else.
+
+group 'com.sezdm.asb_client'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.2'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.sezdm.asb_client'
+    }
+    compileSdk 35
+
+    defaultConfig {
+        minSdkVersion 24
+    }
+    // src/main/jniLibs is already the default jniLibs source set, which is why
+    // cargoBuild writes there rather than somewhere that needs declaring.
+}
+
+// The three ABIs Flutter ships for. x86_64 is not dead weight: it is what the
+// emulators run.
+def androidAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+
+// Always release, even for a debug Flutter build. A debug Rust build runs the
+// chacha/blake3/argon paths unoptimised, turning connection setup from
+// imperceptible into seconds.
+tasks.register('cargoBuild', Exec) {
+    workingDir = file("${projectDir}/../rust")
+
+    def command = ['cargo', 'ndk', '-o', "${projectDir}/src/main/jniLibs"]
+    androidAbis.each { abi -> command += ['-t', abi] }
+    command += ['build', '--release']
+    commandLine command
+
+    inputs.dir file("${projectDir}/../rust/src")
+    inputs.file file("${projectDir}/../rust/Cargo.toml")
+    inputs.file file("${projectDir}/../rust/Cargo.lock")
+    outputs.dir file("${projectDir}/src/main/jniLibs")
+
+    doFirst {
+        if (!System.getenv('ANDROID_NDK_HOME') && !System.getenv('ANDROID_NDK_ROOT')) {
+            throw new GradleException(
+                'ANDROID_NDK_HOME is unset — run this build from inside the devenv shell.')
+        }
+        def onPath = (System.getenv('PATH') ?: '').split(File.pathSeparator)
+            .any { dir -> new File(dir, 'cargo').canExecute() }
+        if (!onPath) {
+            throw new GradleException(
+                'cargo is not on the Gradle daemon\'s PATH. It is almost certainly ' +
+                'a daemon that outlived the devenv shell — run `./gradlew --stop` ' +
+                'in android/ and build again.')
+        }
+    }
+}
+
+// NOT `tasks.whenTaskAdded { if (it.name == 'preBuild') ... }` — that hook only
+// fires for tasks added after it is installed, and `com.android.library` is
+// applied above, so preBuild already exists. The build then succeeds in seconds
+// with no .so anywhere.
+tasks.named('preBuild').configure {
+    dependsOn 'cargoBuild'
+}

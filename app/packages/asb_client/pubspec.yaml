@@ -1,0 +1,37 @@
+name: asb_client
+description: >-
+  Local plugin: an asb-sidecar phone client (end-to-end-encrypted iroh
+  transport) reachable from Dart. Wraps the Rust crate in `rust/` through
+  flutter_rust_bridge; the app's connection layer depends only on what this
+  package exports.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ^3.10.1
+  flutter: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Pinned exactly, not caret-ranged. The generated glue in lib/src/rust and
+  # rust/src/frb_generated.rs is written by codegen 2.11.1 and speaks a wire
+  # format only guaranteed to match this package version.
+  flutter_rust_bridge: 2.11.1
+  # frb renders data-carrying enums (HostEventDto, PayloadDto) as freezed unions.
+  freezed_annotation: ^2.4.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  freezed: ^2.5.7
+  build_runner: ^2.4.13
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true

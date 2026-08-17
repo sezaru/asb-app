@@ -1,0 +1,50 @@
+# Standalone workspace: this crate sits inside the asb-app cargo workspace
+# tree, but is NOT one of its members. Without this empty table cargo walks up,
+# finds the root workspace, and refuses to build ("current package believes
+# it's in a workspace but isn't a member").
+[workspace]
+
+[package]
+name = "asb_client"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# cdylib for Android (dlopen'd by the Dart VM), staticlib for iOS (linked into
+# the app binary), rlib so `cargo test` can link the same code natively — the
+# logic in `client.rs` is exercised by ordinary host tests, and the generated
+# bridge (which holds no logic) is the only part that needs a device.
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# Pinned exactly: the generated glue is version-locked to the codegen binary
+# that wrote it, and the Dart `flutter_rust_bridge` package must match too.
+flutter_rust_bridge = "=2.11.1"
+
+asb-protocol = { path = "../../../../crates/asb-protocol" }
+# Same version + features as asb-protocol so cargo unifies to one iroh crate;
+# this bridge only names the endpoint/address types the protocol hands it.
+iroh = { version = "1.0.0", features = ["platform-verifier"] }
+
+anyhow = "1"
+tokio = { version = "1", features = ["sync", "rt", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tempfile = "3"
+
+# `frb_expand` is set by the codegen binary when it runs `cargo expand`; it is
+# never set during a real build. Declaring it stops rustc warning about an
+# unknown cfg on every `#[frb(...)]` attribute.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+# Size matters on mobile: this ships inside the APK for multiple ABIs. `panic =
+# "abort"` is deliberately NOT set — the bridge catches panics at the boundary
+# and re-raises them as Dart exceptions.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

@@ -1,3 +1,5 @@
+pub use roam_pake;
+
 pub mod client;
 pub mod emacs;
 pub mod identity;
