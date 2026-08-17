@@ -1,3 +1,4 @@
+pub mod client;
 pub mod emacs;
 pub mod identity;
 pub mod model;
