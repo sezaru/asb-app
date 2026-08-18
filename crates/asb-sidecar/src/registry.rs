@@ -92,6 +92,19 @@ impl Registry {
                             input_claimed: false,
                         },
                     );
+                    // Announce the new session to phones already connected, so it
+                    // shows its title right away (a fresh connect learns it via the
+                    // hello SessionList instead).
+                    let metas = sessions
+                        .iter()
+                        .map(|(id, e)| SessionMeta {
+                            id: id.clone(),
+                            title: e.title.clone(),
+                            state: e.state,
+                            last_seq: e.log.last_seq(),
+                        })
+                        .collect();
+                    let _ = self.tx.send(WireMsg::SessionList { sessions: metas });
                 }
             }
             EmacsIn::Msg {
@@ -206,6 +219,11 @@ mod tests {
         .await
         .unwrap();
 
+        // SessionOpen announces the session list before the Msg's Update.
+        assert!(matches!(
+            rx.recv().await.unwrap(),
+            WireMsg::SessionList { .. }
+        ));
         match rx.recv().await.unwrap() {
             WireMsg::Update(u) => {
                 assert_eq!(u.seq, 1);
@@ -234,6 +252,27 @@ mod tests {
         // first answer wins, second (raced) duplicate is dropped
         assert!(reg.resolve_permission("s", "p1"));
         assert!(!reg.resolve_permission("s", "p1"));
+    }
+
+    #[tokio::test]
+    async fn session_open_announces_to_connected() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        let mut rx = reg.subscribe(); // a phone already connected
+        reg.handle_emacs(EmacsIn::SessionOpen {
+            session: "s".into(),
+            title: "My Task".into(),
+        })
+        .await
+        .unwrap();
+        match rx.recv().await.unwrap() {
+            WireMsg::SessionList { sessions } => {
+                assert_eq!(sessions.len(), 1);
+                assert_eq!(sessions[0].id, "s");
+                assert_eq!(sessions[0].title, "My Task");
+            }
+            other => panic!("expected SessionList, got {other:?}"),
+        }
     }
 
     #[tokio::test]

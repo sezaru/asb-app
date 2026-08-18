@@ -221,9 +221,78 @@ class _TurnTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      children: [for (final u in turn.items) _itemTile(u.payload)],
+      children: [for (final n in _mergeNodes(turn.items)) _nodeTile(n)],
     );
   }
+}
+
+/// A rendered element within a turn: a standalone payload, or a tool call with
+/// its `tool_call_update`s folded in by id (agent-shell shows them as one line).
+sealed class _Node {}
+
+class _PayloadNode extends _Node {
+  final PayloadDto payload;
+  _PayloadNode(this.payload);
+}
+
+class _ToolNode extends _Node {
+  final String id;
+  final String label;
+  String status;
+  List<ContentDto> content;
+  _ToolNode({
+    required this.id,
+    required this.label,
+    required this.status,
+    required this.content,
+  });
+}
+
+/// Fold each `tool_call_update` into the `tool_call` it belongs to (same id),
+/// keeping the latest status and content, instead of listing them separately.
+List<_Node> _mergeNodes(List<UpdateDto> items) {
+  final nodes = <_Node>[];
+  final tools = <String, _ToolNode>{};
+  for (final u in items) {
+    switch (u.payload) {
+      case PayloadDto_ToolCall(
+          :final id,
+          :final kind,
+          :final title,
+          :final command,
+          :final status,
+          :final content,
+        ):
+        final node = _ToolNode(
+          id: id,
+          label: '$kind · ${command ?? title}',
+          status: status,
+          content: content,
+        );
+        tools[id] = node;
+        nodes.add(node);
+      case PayloadDto_ToolCallUpdate(:final id, :final status, :final content):
+        final existing = tools[id];
+        if (existing != null) {
+          existing.status = status;
+          if (content.isNotEmpty) existing.content = content;
+        } else {
+          // Update before its call (shouldn't happen) — show it standalone.
+          final node =
+              _ToolNode(id: id, label: 'tool update', status: status, content: content);
+          tools[id] = node;
+          nodes.add(node);
+        }
+      default:
+        nodes.add(_PayloadNode(u.payload));
+    }
+  }
+  return nodes;
+}
+
+Widget _nodeTile(_Node n) {
+  if (n is _ToolNode) return _toolItem(n.label, n.status, n.content);
+  return _itemTile((n as _PayloadNode).payload);
 }
 
 /// Level 2/3: each item collapsed, expandable to its detail.
