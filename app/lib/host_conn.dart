@@ -5,6 +5,12 @@ import 'package:flutter/foundation.dart';
 
 enum ConnStatus { connecting, connected, down }
 
+// Wire-level tracing for the multi-client fidelity tests. kDebugMode is a const
+// `false` in release builds, so these calls tree-shake out entirely there.
+void _trace(String msg) {
+  if (kDebugMode) debugPrint(msg);
+}
+
 /// One mirrored session's live state, accumulated from the event stream.
 class SessionData {
   String title;
@@ -44,11 +50,12 @@ class HostConn extends ChangeNotifier {
   String thinking = 'think';
   String permMode = 'Default';
 
-  /// Seqs of locally-echoed prompts (phone-origin). The sidecar never mirrors a
-  /// phone-injected prompt back as a `user_message`, so we render it optimistically
-  /// and mark it "sent from this phone". Kept high so they sort after real seqs.
+  /// The sidecar authoritatively broadcasts every injected prompt back as a
+  /// `user_message` (so all clients render it, correctly turn-grouped). We don't
+  /// echo optimistically; instead we track prompt text this device sent but
+  /// hasn't seen echoed yet, and badge the matching echo "sent from this phone".
+  final List<String> _pendingSent = [];
   final Set<BigInt> phoneEchoSeqs = {};
-  BigInt _nextEcho = BigInt.two.pow(62);
 
   bool isPhoneEcho(BigInt seq) => phoneEchoSeqs.contains(seq);
 
@@ -83,6 +90,7 @@ class HostConn extends ChangeNotifier {
           if (e.value.lastSeq > BigInt.zero)
             HighWaterDto(session: e.key, lastSeq: e.value.lastSeq),
       ];
+      _trace('ASBHELLO host=$hostId hw=${[for (final h in hw) "${h.session}:${h.lastSeq}"]}');
       await s.hello(highWater: hw);
       _sub = s.events().listen(_onEvent, onDone: _onDropped, onError: (_) => _onDropped());
       _session = s;
@@ -117,6 +125,7 @@ class HostConn extends ChangeNotifier {
   void _onEvent(HostEventDto e) {
     switch (e) {
       case HostEventDto_Sessions(:final field0):
+        _trace('ASBRECV sessions ${[for (final m in field0) "${m.id}:last=${m.lastSeq}:run=${m.running}"]}');
         for (final m in field0) {
           final s = _bucket(m.id, m.title);
           s.title = m.title;
@@ -125,18 +134,28 @@ class HostConn extends ChangeNotifier {
         }
       case HostEventDto_Update(:final field0):
         final s = _bucket(field0.session);
-        if (s.seenSeqs.add(field0.seq)) {
+        final fresh = s.seenSeqs.add(field0.seq);
+        _trace('ASBRECV update sess=${field0.session} seq=${field0.seq} turn=${field0.turn} pl=${field0.payload.runtimeType} fresh=$fresh');
+        if (fresh) {
+          final pl = field0.payload;
+          if (pl is PayloadDto_UserMessage && _pendingSent.remove(pl.text)) {
+            phoneEchoSeqs.add(field0.seq);
+          }
           s.updates.add(field0);
           if (field0.seq > s.lastSeq) s.lastSeq = field0.seq;
         }
       case HostEventDto_Status(:final session, :final running):
+        _trace('ASBRECV status sess=$session running=$running');
         _bucket(session).running = running;
       case HostEventDto_Permission(:final field0):
+        _trace('ASBRECV permission sess=${field0.session} id=${field0.id}');
         _bucket(field0.session).pending = field0;
       case HostEventDto_PermissionResolved(:final session, :final id):
+        _trace('ASBRECV perm-resolved sess=$session id=$id');
         final b = _bucket(session);
         if (b.pending?.id == id) b.pending = null;
       case HostEventDto_Disconnected():
+        _trace('ASBRECV disconnected');
         status = ConnStatus.down;
     }
     notifyListeners();
@@ -145,18 +164,8 @@ class HostConn extends ChangeNotifier {
   Future<void> send(String sessionId, String text) async {
     final t = text.trim();
     if (t.isEmpty) return;
-    final bucket = _bucket(sessionId);
-    final turn = bucket.updates.isEmpty ? BigInt.zero : bucket.updates.last.turn;
-    final seq = _nextEcho;
-    _nextEcho += BigInt.one;
-    phoneEchoSeqs.add(seq);
-    bucket.updates.add(UpdateDto(
-      session: sessionId,
-      seq: seq,
-      turn: turn,
-      payload: PayloadDto.userMessage(text: t),
-    ));
-    notifyListeners();
+    _pendingSent.add(t);
+    _trace('ASBSEND sess=$sessionId len=${t.length}');
     await _session?.input(session: sessionId, text: t);
   }
 
