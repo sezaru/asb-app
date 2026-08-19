@@ -161,6 +161,10 @@ async fn handle_inbound(m: WireMsg, reg: &Arc<Registry>, out_tx: &mpsc::Sender<E
         // gated -- stopping a running turn must always get through.)
         WireMsg::Input { session, text } => {
             if reg.try_claim_input(&session) {
+                // Broadcast the prompt to every client before injecting, so it
+                // shows on all devices (Emacs suppresses the mirror for
+                // remote-injected prompts) grouped with the turn it starts.
+                reg.inject_user_message(&session, text.clone());
                 Some(EmacsOut::Inject { session, text })
             } else {
                 tracing::info!("rejecting input for busy/claimed/unknown session {session}");
@@ -369,8 +373,101 @@ mod tests {
             other => panic!("expected Inject, got {other:?}"),
         }
 
+        // The accepted prompt is also broadcast back as a user_message so every
+        // connected client (not just the sender) renders it.
+        let u2 = client
+            .next_update_timeout(Duration::from_secs(5))
+            .await
+            .unwrap();
+        match u2.payload {
+            Payload::UserMessage { text } => assert_eq!(text, "run it again"),
+            other => panic!("expected injected UserMessage broadcast, got {other:?}"),
+        }
+
         p.host_ep.close().await;
         p.phone_ep.close().await;
+    }
+
+    #[tokio::test]
+    async fn injected_prompt_broadcasts_to_all_clients() {
+        // The regression this guards: a prompt typed on ONE client must appear on
+        // EVERY connected client (finding #1), grouped with the turn it starts
+        // (finding #2). Two real phones over loopback iroh, one shared session.
+        let dir = tempfile::tempdir().unwrap();
+        let host_id = Identity::load_or_create(&dir.path().join("host.json")).unwrap();
+        let p1_id = Identity::load_or_create(&dir.path().join("p1.json")).unwrap();
+        let p2_id = Identity::load_or_create(&dir.path().join("p2.json")).unwrap();
+        let reg = Arc::new(Registry::new(dir.path().join("logs")));
+        let roster = Arc::new(Mutex::new(Roster::load(&dir.path().join("roster.json")).unwrap()));
+        let host_ep = build_endpoint_minimal(host_id.secret_bytes()).await.unwrap();
+        let p1_ep = build_endpoint_minimal(p1_id.secret_bytes()).await.unwrap();
+        let p2_ep = build_endpoint_minimal(p2_id.secret_bytes()).await.unwrap();
+        let host_addr = ready_addr(&host_ep).await;
+        let host_node = host_ep.id();
+
+        // Pair both phones into the roster BEFORE the server claims the endpoint
+        // (the phone-server accept loop rejects the pairing ALPN).
+        for pair in [(&p1_ep, &p1_id), (&p2_ep, &p2_id)] {
+            let code = PairingCode::generate();
+            let code_str = code.as_str().to_string();
+            let (host_res, _) = tokio::join!(
+                pair_host(&host_ep, &code, &host_id),
+                pair_join(
+                    pair.0,
+                    host_node,
+                    host_addr.clone(),
+                    PairingCode::parse(&code_str).unwrap(),
+                    pair.1,
+                    None,
+                ),
+            );
+            roster.lock().unwrap().add(host_res.unwrap()).unwrap();
+        }
+
+        let (out_tx, mut out_rx) = mpsc::channel(16);
+        let _srv = spawn_phone_server(
+            host_ep.clone(),
+            reg.clone(),
+            roster.clone(),
+            out_tx,
+            Presence::new(),
+        );
+
+        // A session, open and idle, so a phone prompt is accepted.
+        reg.handle_emacs(0, EmacsIn::SessionOpen { session: "s".into(), title: "demo".into() })
+            .await
+            .unwrap();
+
+        let mut c1 = PhoneClient::connect(&p1_ep, host_addr.clone()).await.unwrap();
+        let mut c2 = PhoneClient::connect(&p2_ep, host_addr.clone()).await.unwrap();
+        c1.hello(None, HashMap::new()).await.unwrap();
+        c2.hello(None, HashMap::new()).await.unwrap();
+
+        // Phone 1 types a prompt.
+        c1.input("s", "hello from phone one").await.unwrap();
+
+        // Emacs is asked to inject it...
+        let ev = tokio::time::timeout(Duration::from_secs(5), out_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(ev, EmacsOut::Inject { .. }));
+
+        // ...and BOTH clients (sender AND the other device) render it as a
+        // user_message grouped with the turn it starts (turn 1 on a fresh
+        // session), not a bare response with no question.
+        for c in [&mut c1, &mut c2] {
+            let u = c.next_update_timeout(Duration::from_secs(5)).await.unwrap();
+            assert_eq!(u.turn, 1);
+            match u.payload {
+                Payload::UserMessage { text } => assert_eq!(text, "hello from phone one"),
+                other => panic!("expected UserMessage on every client, got {other:?}"),
+            }
+        }
+
+        host_ep.close().await;
+        p1_ep.close().await;
+        p2_ep.close().await;
     }
 
     #[tokio::test]

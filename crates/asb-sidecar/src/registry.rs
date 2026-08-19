@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use asb_protocol::emacs::EmacsIn;
-use asb_protocol::model::{SessionId, SessionState, Seq, TurnId, Update};
+use asb_protocol::model::{Payload, SessionId, SessionState, Seq, TurnId, Update};
 use asb_protocol::replay::ReplayLog;
 use asb_protocol::wire::{SessionMeta, WireMsg};
 use tokio::sync::{broadcast, watch};
@@ -125,6 +125,34 @@ impl Registry {
                 true
             }
             _ => false,
+        }
+    }
+
+    /// Record a client-injected prompt as a `user_message` Update so it shows on
+    /// EVERY connected client (and late joiners, via the replay log) -- not just
+    /// the device that typed it. The Emacs send-command tap suppresses the mirror
+    /// for remote-injected prompts, so the sidecar is the sole source here.
+    /// Called only after `try_claim_input` succeeded: the session is idle and the
+    /// next Emacs `Status Running` bumps `turn` to `turn + 1`, so that is the turn
+    /// this prompt belongs to (grouping it with its own response, not the prior
+    /// turn). Best-effort: a log-append failure is logged and dropped.
+    pub fn inject_user_message(&self, session: &SessionId, text: String) {
+        let mut sessions = self.sessions.lock().unwrap();
+        let Some(entry) = sessions.get_mut(session) else {
+            return;
+        };
+        let turn = entry.turn + 1;
+        let payload = Payload::UserMessage { text };
+        match entry.log.append(payload.clone(), turn, None) {
+            Ok(seq) => {
+                let _ = self.tx.send(WireMsg::Update(Update {
+                    session: session.clone(),
+                    seq,
+                    turn,
+                    payload,
+                }));
+            }
+            Err(e) => tracing::warn!("failed to log injected prompt for {session}: {e:#}"),
         }
     }
 
@@ -368,6 +396,39 @@ mod tests {
         // A genuinely new ord=6 still lands.
         reg.handle_emacs(0, mk_msg(6, "bye")).await.unwrap();
         assert_eq!(reg.last_seq("s"), 2);
+    }
+
+    #[tokio::test]
+    async fn inject_user_message_broadcasts_next_turn() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        reg.handle_emacs(0, EmacsIn::SessionOpen { session: "s".into(), title: "t".into() })
+            .await
+            .unwrap();
+        // One completed turn so `turn` sits at 1 and the session is idle.
+        reg.handle_emacs(0, EmacsIn::Status { session: "s".into(), state: SessionState::Running })
+            .await
+            .unwrap();
+        reg.handle_emacs(0, EmacsIn::Status { session: "s".into(), state: SessionState::Idle })
+            .await
+            .unwrap();
+
+        let mut rx = reg.subscribe();
+        reg.inject_user_message(&"s".to_string(), "do it again".into());
+        // Grouped with the turn it starts (2), not the completed one (1), and
+        // durably logged so a late joiner replays it.
+        match rx.recv().await.unwrap() {
+            WireMsg::Update(u) => {
+                assert_eq!(u.turn, 2, "prompt groups with the turn it starts");
+                assert_eq!(u.seq, 1);
+                match u.payload {
+                    Payload::UserMessage { text } => assert_eq!(text, "do it again"),
+                    other => panic!("expected UserMessage, got {other:?}"),
+                }
+            }
+            other => panic!("expected Update, got {other:?}"),
+        }
+        assert_eq!(reg.read_since("s", 0).unwrap().len(), 1);
     }
 
     #[tokio::test]
