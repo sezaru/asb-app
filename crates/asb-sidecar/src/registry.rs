@@ -17,6 +17,11 @@ pub struct Registry {
     /// Permission requests still awaiting an answer, keyed `(session, id)`. The
     /// first device to answer removes the entry; later duplicates are ignored.
     pending_perms: Mutex<HashSet<(SessionId, String)>>,
+    /// Resume gate: session -> the connection that reserved it. Set at
+    /// agent-shell-start (before the session is opened by a prompt), so a second
+    /// buffer/instance resuming the same session is denied. Released when the
+    /// owner closes the session or its connection drops.
+    claims: Mutex<HashMap<SessionId, u64>>,
     tx: broadcast::Sender<WireMsg>,
     /// Count of active (open) sessions, published on every change. The daemon
     /// watches this to self-terminate once the last agent-shell buffer closes.
@@ -50,6 +55,7 @@ impl Registry {
             dir,
             sessions: Mutex::new(HashMap::new()),
             pending_perms: Mutex::new(HashSet::new()),
+            claims: Mutex::new(HashMap::new()),
             tx,
             active_tx,
             _active_keepalive: active_keepalive,
@@ -64,11 +70,36 @@ impl Registry {
     /// Free every session owned by a dropped connection (its Emacs closed or
     /// crashed), decrementing the active count so the daemon can wind down.
     pub fn close_connection(&self, conn: u64) {
+        self.claims.lock().unwrap().retain(|_, &mut c| c != conn);
         let mut sessions = self.sessions.lock().unwrap();
         let before = sessions.len();
         sessions.retain(|_, e| e.owner != conn);
         if sessions.len() != before {
             let _ = self.active_tx.send(sessions.len());
+        }
+    }
+
+    /// Atomically reserve SESSION for a resume under CONN.  Returns false when
+    /// it is already open or reserved by a DIFFERENT connection (resumed
+    /// elsewhere) -- the caller then blocks agent-shell from opening the buffer.
+    /// Re-entrant for the same conn (a retry).  A dropped connection's
+    /// reservations are swept by `close_connection`, so a crash never wedges a
+    /// session as permanently un-resumable.
+    pub fn claim(&self, conn: u64, session: &SessionId) -> bool {
+        // Already open under a different live connection also blocks (the
+        // reservation may have lapsed but the session is genuinely active).
+        if let Some(e) = self.sessions.lock().unwrap().get(session) {
+            if e.owner != conn {
+                return false;
+            }
+        }
+        let mut claims = self.claims.lock().unwrap();
+        match claims.get(session) {
+            Some(&owner) if owner != conn => false,
+            _ => {
+                claims.insert(session.clone(), conn);
+                true
+            }
         }
     }
 
@@ -203,9 +234,13 @@ impl Registry {
             }
             EmacsIn::SessionClose { session } => {
                 sessions.remove(&session);
+                self.claims.lock().unwrap().remove(&session);
                 self.pending_perms.lock().unwrap().retain(|(s, _)| s != &session);
                 let _ = self.active_tx.send(sessions.len());
             }
+            // Handled synchronously in the emacs server (it needs the boolean
+            // reply); never reaches the registry's async dispatch.
+            EmacsIn::SessionClaim { .. } => {}
         }
         Ok(())
     }
@@ -369,6 +404,40 @@ mod tests {
         // The current owner dropping does free it.
         reg.close_connection(2);
         assert_eq!(*reg.active_rx().borrow(), 0);
+    }
+
+    #[tokio::test]
+    async fn claim_blocks_concurrent_resume_and_releases() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        let s = "s".to_string();
+        // conn 1 reserves it; a retry from conn 1 is re-entrant.
+        assert!(reg.claim(1, &s));
+        assert!(reg.claim(1, &s));
+        // conn 2 (a second buffer/instance) is blocked while 1 holds it.
+        assert!(!reg.claim(2, &s));
+        // conn 1 closing the session releases the reservation.
+        reg.handle_emacs(1, EmacsIn::SessionClose { session: s.clone() })
+            .await
+            .unwrap();
+        assert!(reg.claim(2, &s));
+        // conn 2's connection dropping (crash) releases its reservation too.
+        reg.close_connection(2);
+        assert!(reg.claim(1, &s));
+    }
+
+    #[tokio::test]
+    async fn claim_blocked_by_active_session_owned_elsewhere() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        let s = "s".to_string();
+        // Session already open under conn 1 (first prompt sent, past the gate).
+        reg.handle_emacs(1, EmacsIn::SessionOpen { session: s.clone(), title: "t".into() })
+            .await
+            .unwrap();
+        // A resume from conn 2 is blocked; the owner may still re-claim.
+        assert!(!reg.claim(2, &s));
+        assert!(reg.claim(1, &s));
     }
 
     #[tokio::test]

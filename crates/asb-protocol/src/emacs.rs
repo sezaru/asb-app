@@ -36,6 +36,13 @@ pub enum EmacsIn {
     SessionClose {
         session: SessionId,
     },
+    /// Synchronous resume gate: reserve SESSION before agent-shell opens the
+    /// buffer, so the same session cannot be resumed in two buffers/instances
+    /// at once. The sidecar replies `claim-result` correlated by `cid`.
+    SessionClaim {
+        session: SessionId,
+        cid: u64,
+    },
 }
 
 /// Sidecar -> provider (Emacs), one JSON object per line.

@@ -72,6 +72,11 @@ fn ack_line(cid: u64) -> String {
     format!("{{\"t\":\"ack\",\"cid\":{cid}}}")
 }
 
+/// Reply to a `session-claim`, correlated by `cid`, carrying the grant.
+fn claim_result_line(cid: u64, granted: bool) -> String {
+    format!("{{\"t\":\"claim-result\",\"cid\":{cid},\"granted\":{granted}}}")
+}
+
 /// Monotonic id per Emacs-server connection, so the registry can free the
 /// sessions a dropped connection owned.
 static NEXT_CONN: AtomicU64 = AtomicU64::new(1);
@@ -105,6 +110,13 @@ async fn handle_conn(conn: u64, stream: UnixStream, reg: Arc<Registry>, owners: 
             .ok()
             .and_then(|v| v.get("cid").and_then(|x| x.as_u64()));
         match serde_json::from_str::<EmacsIn>(&line) {
+            // Synchronous resume gate: reply with the grant, correlated by cid,
+            // and do NOT fall through to the generic ack.
+            Ok(EmacsIn::SessionClaim { session, cid }) => {
+                let granted = reg.claim(conn, &session);
+                let _ = line_tx.send(claim_result_line(cid, granted));
+                continue;
+            }
             Ok(msg) => {
                 if let EmacsIn::SessionOpen { session, .. } = &msg {
                     owners
@@ -203,6 +215,41 @@ mod tests {
             .unwrap();
         let line = read_one_line(&mut cli).await;
         assert!(line.contains("\"t\":\"inject\""), "got {line}");
+    }
+
+    #[tokio::test]
+    async fn session_claim_grants_then_blocks_second_connection() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock = dir.path().join("asb.sock");
+        let reg = Arc::new(Registry::new(dir.path().to_path_buf()));
+        let (_out_tx, out_rx) = mpsc::channel(16);
+        let _srv = spawn_emacs_server(sock.clone(), reg.clone(), out_rx).unwrap();
+
+        // First connection resumes session s -> granted.
+        let mut a = UnixStream::connect(&sock).await.unwrap();
+        a.write_all(b"{\"t\":\"session-claim\",\"session\":\"s\",\"cid\":7}\n")
+            .await
+            .unwrap();
+        let r = read_one_line(&mut a).await;
+        assert!(r.contains("\"t\":\"claim-result\"") && r.contains("\"cid\":7")
+                && r.contains("\"granted\":true"), "got {r}");
+
+        // A second connection resuming the same session -> denied.
+        let mut b = UnixStream::connect(&sock).await.unwrap();
+        b.write_all(b"{\"t\":\"session-claim\",\"session\":\"s\",\"cid\":9}\n")
+            .await
+            .unwrap();
+        let r2 = read_one_line(&mut b).await;
+        assert!(r2.contains("\"cid\":9") && r2.contains("\"granted\":false"), "got {r2}");
+
+        // First connection drops -> its reservation frees; b may now claim.
+        drop(a);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        b.write_all(b"{\"t\":\"session-claim\",\"session\":\"s\",\"cid\":10}\n")
+            .await
+            .unwrap();
+        let r3 = read_one_line(&mut b).await;
+        assert!(r3.contains("\"cid\":10") && r3.contains("\"granted\":true"), "got {r3}");
     }
 
     #[tokio::test]
