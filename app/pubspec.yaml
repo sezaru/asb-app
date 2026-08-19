@@ -43,6 +43,9 @@ dependencies:
   # App-private directory for the client's identity + host roster.
   path_provider: ^2.1.4
 
+  # Inter (body/heading) + Roboto Mono (code) — the Nocturne design faces.
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
