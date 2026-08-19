@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds use only this manifest (not debug/profile), so INTERNET
+         must live here or iroh's socket bind fails with EPERM at startup. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="asb"
         android:name="${applicationName}"
