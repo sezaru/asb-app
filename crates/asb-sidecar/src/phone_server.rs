@@ -312,33 +312,35 @@ mod tests {
 
         // scripted turn
         p.reg
-            .handle_emacs(EmacsIn::SessionOpen {
+            .handle_emacs(0, EmacsIn::SessionOpen {
                 session: "s".into(),
                 title: "demo".into(),
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Running,
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Msg {
+            .handle_emacs(0, EmacsIn::Msg {
                 session: "s".into(),
                 seq: 0,
                 turn: 0,
                 payload: Payload::AgentMessage {
                     text: "the answer is 42".into(),
                 },
+                cid: None,
+                epoch: None,
             })
             .await
             .unwrap();
         // Turn complete -> idle, so the phone's follow-up prompt is accepted.
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Idle,
             })
@@ -386,14 +388,14 @@ mod tests {
         );
 
         p.reg
-            .handle_emacs(EmacsIn::SessionOpen {
+            .handle_emacs(0, EmacsIn::SessionOpen {
                 session: "s".into(),
                 title: "demo".into(),
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Permission {
+            .handle_emacs(0, EmacsIn::Permission {
                 session: "s".into(),
                 id: "p1".into(),
                 command: "rm -rf".into(),
@@ -450,14 +452,14 @@ mod tests {
         );
 
         p.reg
-            .handle_emacs(EmacsIn::SessionOpen {
+            .handle_emacs(0, EmacsIn::SessionOpen {
                 session: "s".into(),
                 title: "demo".into(),
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Running,
             })
@@ -480,7 +482,7 @@ mod tests {
 
         // Once idle, the same phone's prompt is accepted.
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Idle,
             })
@@ -515,7 +517,7 @@ mod tests {
 
         // Session opens idle; Emacs has NOT reported Running yet.
         p.reg
-            .handle_emacs(EmacsIn::SessionOpen {
+            .handle_emacs(0, EmacsIn::SessionOpen {
                 session: "s".into(),
                 title: "demo".into(),
             })
@@ -549,14 +551,14 @@ mod tests {
 
         // Emacs runs the turn and returns to idle -> the claim is released.
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Running,
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Idle,
             })
@@ -591,21 +593,21 @@ mod tests {
 
         // no phone connected -> presence 0
         p.reg
-            .handle_emacs(EmacsIn::SessionOpen {
+            .handle_emacs(0, EmacsIn::SessionOpen {
                 session: "s".into(),
                 title: "demo".into(),
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Running,
             })
             .await
             .unwrap();
         p.reg
-            .handle_emacs(EmacsIn::Status {
+            .handle_emacs(0, EmacsIn::Status {
                 session: "s".into(),
                 state: SessionState::Idle,
             })

@@ -6,7 +6,7 @@ use asb_protocol::emacs::EmacsIn;
 use asb_protocol::model::{SessionId, SessionState, Seq, TurnId, Update};
 use asb_protocol::replay::ReplayLog;
 use asb_protocol::wire::{SessionMeta, WireMsg};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
 
 /// Aggregates sessions from all connected Emacs instances. The sidecar — not the
 /// provider — assigns `seq` (from the replay log) and `turn` (bumped on
@@ -18,6 +18,13 @@ pub struct Registry {
     /// first device to answer removes the entry; later duplicates are ignored.
     pending_perms: Mutex<HashSet<(SessionId, String)>>,
     tx: broadcast::Sender<WireMsg>,
+    /// Count of active (open) sessions, published on every change. The daemon
+    /// watches this to self-terminate once the last agent-shell buffer closes.
+    active_tx: watch::Sender<usize>,
+    /// Kept alive so `active_tx.send` always has a receiver and therefore always
+    /// updates the stored count -- otherwise a send with no live subscriber is a
+    /// silent no-op and the count desyncs.
+    _active_keepalive: watch::Receiver<usize>,
 }
 
 struct SessionEntry {
@@ -25,6 +32,10 @@ struct SessionEntry {
     title: String,
     state: SessionState,
     turn: TurnId,
+    /// Emacs-server connection id that currently owns this session. Reconnect
+    /// re-adopts it (SessionOpen updates the owner); a dropped connection frees
+    /// the sessions it owned (`close_connection`), which drives the ref-count.
+    owner: u64,
     /// Optimistically set the instant a phone prompt is accepted, before Emacs
     /// reports Running, so a second prompt racing within the same RTT loses.
     /// Cleared by the next Status from Emacs (which is then authoritative).
@@ -34,11 +45,30 @@ struct SessionEntry {
 impl Registry {
     pub fn new(dir: PathBuf) -> Self {
         let (tx, _) = broadcast::channel(1024);
+        let (active_tx, active_keepalive) = watch::channel(0);
         Self {
             dir,
             sessions: Mutex::new(HashMap::new()),
             pending_perms: Mutex::new(HashSet::new()),
             tx,
+            active_tx,
+            _active_keepalive: active_keepalive,
+        }
+    }
+
+    /// Watch the active-session count (for ref-counted daemon shutdown).
+    pub fn active_rx(&self) -> watch::Receiver<usize> {
+        self.active_tx.subscribe()
+    }
+
+    /// Free every session owned by a dropped connection (its Emacs closed or
+    /// crashed), decrementing the active count so the daemon can wind down.
+    pub fn close_connection(&self, conn: u64) {
+        let mut sessions = self.sessions.lock().unwrap();
+        let before = sessions.len();
+        sessions.retain(|_, e| e.owner != conn);
+        if sessions.len() != before {
+            let _ = self.active_tx.send(sessions.len());
         }
     }
 
@@ -76,11 +106,15 @@ impl Registry {
         let _ = self.tx.send(m);
     }
 
-    pub async fn handle_emacs(&self, msg: EmacsIn) -> anyhow::Result<()> {
+    pub async fn handle_emacs(&self, conn: u64, msg: EmacsIn) -> anyhow::Result<()> {
         let mut sessions = self.sessions.lock().unwrap();
         match msg {
             EmacsIn::SessionOpen { session, title } => {
-                if !sessions.contains_key(&session) {
+                if let Some(e) = sessions.get_mut(&session) {
+                    // Reconnect / re-announce: re-adopt under the current conn so
+                    // a socket blip doesn't orphan the session.
+                    e.owner = conn;
+                } else {
                     let log = ReplayLog::open(&self.dir, &session)?;
                     sessions.insert(
                         session,
@@ -89,6 +123,7 @@ impl Registry {
                             title,
                             state: SessionState::Idle,
                             turn: 0,
+                            owner: conn,
                             input_claimed: false,
                         },
                     );
@@ -106,14 +141,31 @@ impl Registry {
                         .collect();
                     let _ = self.tx.send(WireMsg::SessionList { sessions: metas });
                 }
+                let _ = self.active_tx.send(sessions.len());
             }
             EmacsIn::Msg {
-                session, payload, ..
+                session,
+                payload,
+                cid,
+                epoch,
+                ..
             } => {
                 let entry = sessions
                     .get_mut(&session)
                     .ok_or_else(|| anyhow::anyhow!("msg for unknown session {session}"))?;
-                let seq = entry.log.append(payload.clone(), entry.turn)?;
+                let dedup = match (epoch, cid) {
+                    (Some(e), Some(c)) => Some((e, c)),
+                    _ => None,
+                };
+                // A resent, already-applied message: the log's high-water (rebuilt
+                // from disk on open) recognizes it across restarts, so we skip the
+                // append AND the re-broadcast — no duplicate on any phone.
+                if let Some((e, c)) = &dedup {
+                    if entry.log.is_applied(e, *c) {
+                        return Ok(());
+                    }
+                }
+                let seq = entry.log.append(payload.clone(), entry.turn, dedup)?;
                 let _ = self.tx.send(WireMsg::Update(Update {
                     session,
                     seq,
@@ -152,6 +204,7 @@ impl Registry {
             EmacsIn::SessionClose { session } => {
                 sessions.remove(&session);
                 self.pending_perms.lock().unwrap().retain(|(s, _)| s != &session);
+                let _ = self.active_tx.send(sessions.len());
             }
         }
         Ok(())
@@ -204,17 +257,19 @@ mod tests {
         let reg = Registry::new(dir.path().to_path_buf());
         let mut rx = reg.subscribe();
 
-        reg.handle_emacs(EmacsIn::SessionOpen {
+        reg.handle_emacs(0, EmacsIn::SessionOpen {
             session: "s".into(),
             title: "t".into(),
         })
         .await
         .unwrap();
-        reg.handle_emacs(EmacsIn::Msg {
+        reg.handle_emacs(0, EmacsIn::Msg {
             session: "s".into(),
             seq: 0,
             turn: 99, // provider's turn is advisory; the registry owns it
             payload: Payload::AgentMessage { text: "hi".into() },
+            cid: None,
+            epoch: None,
         })
         .await
         .unwrap();
@@ -235,10 +290,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn msg_resend_deduped_across_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mk_msg = |c: u64, text: &str| EmacsIn::Msg {
+            session: "s".into(),
+            seq: 0,
+            turn: 0,
+            payload: Payload::AgentMessage { text: text.into() },
+            cid: Some(c),
+            epoch: Some("e".into()),
+        };
+        {
+            let reg = Registry::new(dir.path().to_path_buf());
+            reg.handle_emacs(0, EmacsIn::SessionOpen {
+                session: "s".into(),
+                title: "t".into(),
+            })
+            .await
+            .unwrap();
+            reg.handle_emacs(0, mk_msg(5, "hi")).await.unwrap();
+            assert_eq!(reg.last_seq("s"), 1);
+        }
+        // A fresh Registry over the same dir simulates a daemon restart: the
+        // per-session log rebuilds its dedup high-water from disk.
+        let reg = Registry::new(dir.path().to_path_buf());
+        reg.handle_emacs(0, EmacsIn::SessionOpen {
+            session: "s".into(),
+            title: "t".into(),
+        })
+        .await
+        .unwrap();
+        assert_eq!(reg.last_seq("s"), 1);
+        // The provider resends the un-acked cid=5 -> recognized, not re-appended.
+        reg.handle_emacs(0, mk_msg(5, "hi")).await.unwrap();
+        assert_eq!(reg.last_seq("s"), 1, "resend across restart must not duplicate");
+        // A genuinely new cid=6 still lands.
+        reg.handle_emacs(0, mk_msg(6, "bye")).await.unwrap();
+        assert_eq!(reg.last_seq("s"), 2);
+    }
+
+    #[tokio::test]
+    async fn active_count_tracks_open_close_and_connection_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        let rx = reg.active_rx();
+        assert_eq!(*rx.borrow(), 0);
+        for s in ["a", "b"] {
+            reg.handle_emacs(1, EmacsIn::SessionOpen { session: s.into(), title: s.into() })
+                .await
+                .unwrap();
+        }
+        assert_eq!(*rx.borrow(), 2);
+        // explicit buffer close decrements
+        reg.handle_emacs(1, EmacsIn::SessionClose { session: "a".into() })
+            .await
+            .unwrap();
+        assert_eq!(*rx.borrow(), 1);
+        // the owning connection dropping frees the rest -> daemon can wind down
+        reg.close_connection(1);
+        assert_eq!(*rx.borrow(), 0);
+    }
+
+    #[tokio::test]
+    async fn reconnect_readopts_session_so_old_conn_drop_is_harmless() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        reg.handle_emacs(1, EmacsIn::SessionOpen { session: "s".into(), title: "t".into() })
+            .await
+            .unwrap();
+        // A reconnect re-announces the same session on a NEW connection.
+        reg.handle_emacs(2, EmacsIn::SessionOpen { session: "s".into(), title: "t".into() })
+            .await
+            .unwrap();
+        assert_eq!(*reg.active_rx().borrow(), 1);
+        // The stale (old) connection dropping must NOT free it -- ownership moved.
+        reg.close_connection(1);
+        assert_eq!(*reg.active_rx().borrow(), 1, "blip must not orphan the session");
+        // The current owner dropping does free it.
+        reg.close_connection(2);
+        assert_eq!(*reg.active_rx().borrow(), 0);
+    }
+
+    #[tokio::test]
     async fn permission_resolves_once() {
         let dir = tempfile::tempdir().unwrap();
         let reg = Registry::new(dir.path().to_path_buf());
-        reg.handle_emacs(EmacsIn::Permission {
+        reg.handle_emacs(0, EmacsIn::Permission {
             session: "s".into(),
             id: "p1".into(),
             command: "rm -rf".into(),
@@ -259,7 +396,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let reg = Registry::new(dir.path().to_path_buf());
         let mut rx = reg.subscribe(); // a phone already connected
-        reg.handle_emacs(EmacsIn::SessionOpen {
+        reg.handle_emacs(0, EmacsIn::SessionOpen {
             session: "s".into(),
             title: "My Task".into(),
         })
@@ -279,24 +416,26 @@ mod tests {
     async fn running_bumps_turn() {
         let dir = tempfile::tempdir().unwrap();
         let reg = Registry::new(dir.path().to_path_buf());
-        reg.handle_emacs(EmacsIn::SessionOpen {
+        reg.handle_emacs(0, EmacsIn::SessionOpen {
             session: "s".into(),
             title: "t".into(),
         })
         .await
         .unwrap();
         let mut rx = reg.subscribe();
-        reg.handle_emacs(EmacsIn::Status {
+        reg.handle_emacs(0, EmacsIn::Status {
             session: "s".into(),
             state: SessionState::Running,
         })
         .await
         .unwrap();
-        reg.handle_emacs(EmacsIn::Msg {
+        reg.handle_emacs(0, EmacsIn::Msg {
             session: "s".into(),
             seq: 0,
             turn: 0,
             payload: Payload::AgentMessage { text: "hi".into() },
+            cid: None,
+            epoch: None,
         })
         .await
         .unwrap();

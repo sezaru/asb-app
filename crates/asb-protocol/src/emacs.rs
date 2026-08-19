@@ -15,6 +15,13 @@ pub enum EmacsIn {
         seq: Seq,
         turn: TurnId,
         payload: Payload,
+        /// At-least-once dedup key, from the provider's outbox. `cid` is
+        /// monotonic within an `epoch` (one provider process lifetime); a
+        /// resent `cid <= applied` is skipped, not re-appended.
+        #[serde(default)]
+        cid: Option<u64>,
+        #[serde(default)]
+        epoch: Option<String>,
     },
     Status {
         session: SessionId,
