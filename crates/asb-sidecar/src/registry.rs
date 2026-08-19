@@ -177,26 +177,21 @@ impl Registry {
             EmacsIn::Msg {
                 session,
                 payload,
-                cid,
-                epoch,
+                ord,
                 ..
             } => {
                 let entry = sessions
                     .get_mut(&session)
                     .ok_or_else(|| anyhow::anyhow!("msg for unknown session {session}"))?;
-                let dedup = match (epoch, cid) {
-                    (Some(e), Some(c)) => Some((e, c)),
-                    _ => None,
-                };
-                // A resent, already-applied message: the log's high-water (rebuilt
-                // from disk on open) recognizes it across restarts, so we skip the
-                // append AND the re-broadcast — no duplicate on any phone.
-                if let Some((e, c)) = &dedup {
-                    if entry.log.is_applied(e, *c) {
+                // A resend OR a replayed phrase whose ordinal is at/below the
+                // persisted high-water is already durable: skip the append AND the
+                // re-broadcast, so a resume never duplicates history on any phone.
+                if let Some(o) = ord {
+                    if entry.log.is_applied(o) {
                         return Ok(());
                     }
                 }
-                let seq = entry.log.append(payload.clone(), entry.turn, dedup)?;
+                let seq = entry.log.append(payload.clone(), entry.turn, ord)?;
                 let _ = self.tx.send(WireMsg::Update(Update {
                     session,
                     seq,
@@ -243,6 +238,18 @@ impl Registry {
             EmacsIn::SessionClaim { .. } => {}
         }
         Ok(())
+    }
+
+    /// The session's persisted ordinal high-water, reported to the provider on
+    /// session-open so it can seed its per-session counter (and, on a replay,
+    /// know how far to re-number before new phrases start appending).
+    pub fn high_water(&self, session: &str) -> u64 {
+        self.sessions
+            .lock()
+            .unwrap()
+            .get(session)
+            .map(|e| e.log.high_water_ord())
+            .unwrap_or(0)
     }
 
     pub fn last_seq(&self, session: &str) -> Seq {
@@ -303,8 +310,7 @@ mod tests {
             seq: 0,
             turn: 99, // provider's turn is advisory; the registry owns it
             payload: Payload::AgentMessage { text: "hi".into() },
-            cid: None,
-            epoch: None,
+            ord: None,
         })
         .await
         .unwrap();
@@ -327,13 +333,12 @@ mod tests {
     #[tokio::test]
     async fn msg_resend_deduped_across_reopen() {
         let dir = tempfile::tempdir().unwrap();
-        let mk_msg = |c: u64, text: &str| EmacsIn::Msg {
+        let mk_msg = |o: u64, text: &str| EmacsIn::Msg {
             session: "s".into(),
             seq: 0,
             turn: 0,
             payload: Payload::AgentMessage { text: text.into() },
-            cid: Some(c),
-            epoch: Some("e".into()),
+            ord: Some(o),
         };
         {
             let reg = Registry::new(dir.path().to_path_buf());
@@ -356,10 +361,11 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(reg.last_seq("s"), 1);
-        // The provider resends the un-acked cid=5 -> recognized, not re-appended.
+        // The provider resends ord=5 (or a resume replays that phrase) -> the
+        // rebuilt high-water recognizes it, so it is not re-appended.
         reg.handle_emacs(0, mk_msg(5, "hi")).await.unwrap();
         assert_eq!(reg.last_seq("s"), 1, "resend across restart must not duplicate");
-        // A genuinely new cid=6 still lands.
+        // A genuinely new ord=6 still lands.
         reg.handle_emacs(0, mk_msg(6, "bye")).await.unwrap();
         assert_eq!(reg.last_seq("s"), 2);
     }
@@ -503,8 +509,7 @@ mod tests {
             seq: 0,
             turn: 0,
             payload: Payload::AgentMessage { text: "hi".into() },
-            cid: None,
-            epoch: None,
+            ord: None,
         })
         .await
         .unwrap();

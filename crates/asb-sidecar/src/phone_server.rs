@@ -333,8 +333,7 @@ mod tests {
                 payload: Payload::AgentMessage {
                     text: "the answer is 42".into(),
                 },
-                cid: None,
-                epoch: None,
+                ord: None,
             })
             .await
             .unwrap();

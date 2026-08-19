@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -15,22 +14,23 @@ pub struct ReplayLog {
     session: String,
     file: File,
     next_seq: Seq,
-    /// Provider epoch -> highest applied client id, rebuilt from the log on
-    /// open. Because the dedup key lives *in the persisted record*, this
-    /// survives a daemon restart, so a resent (already-applied) message is
-    /// recognized and skipped even after a crash — no duplicate, ever.
-    applied: HashMap<String, u64>,
+    /// Highest applied provider *ordinal* (`ord`), rebuilt from the log on open.
+    /// The provider numbers a session's phrases 1,2,3… in stable order; on a
+    /// resume it replays the same phrases with the same ordinals, so this
+    /// high-water lets us skip everything already durable and append only the
+    /// genuinely-new tail — deduping resends AND semantic re-mirrors across a
+    /// daemon restart, with no epoch and no duplicates.
+    applied_ord: u64,
 }
 
-/// The on-disk record: an [`Update`] plus the optional at-least-once dedup key
-/// `(epoch, cid)` of the provider message that produced it. Older logs hold a
-/// bare `Update`; [`ReplayLog::scan`] falls back to that for back-compat.
+/// The on-disk record: an [`Update`] plus the optional per-session provider
+/// ordinal (`ord`) of the message that produced it. `ord` is the dedup key.
 #[derive(Serialize, Deserialize)]
 struct Record {
     #[serde(rename = "u")]
     update: Update,
-    #[serde(rename = "d", default, skip_serializing_if = "Option::is_none")]
-    dedup: Option<(String, u64)>,
+    #[serde(rename = "o", default, skip_serializing_if = "Option::is_none")]
+    ord: Option<u64>,
 }
 
 const MAX_RECORD: usize = 16 * 1024 * 1024;
@@ -41,15 +41,7 @@ impl ReplayLog {
         let path = dir.join(format!("{session}.log"));
         let existing = Self::scan(&path)?;
         let next_seq = existing.last().map(|r| r.update.seq + 1).unwrap_or(1);
-        let mut applied: HashMap<String, u64> = HashMap::new();
-        for r in &existing {
-            if let Some((epoch, cid)) = &r.dedup {
-                let hw = applied.entry(epoch.clone()).or_insert(0);
-                if *cid > *hw {
-                    *hw = *cid;
-                }
-            }
-        }
+        let applied_ord = existing.iter().filter_map(|r| r.ord).max().unwrap_or(0);
         let file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -60,21 +52,29 @@ impl ReplayLog {
             session: session.to_string(),
             file,
             next_seq,
-            applied,
+            applied_ord,
         })
     }
 
-    /// True if `cid` for `epoch` was already durably appended (so a resend must
-    /// be skipped, not re-applied). Monotonic per epoch, so a high-water compare.
-    pub fn is_applied(&self, epoch: &str, cid: u64) -> bool {
-        self.applied.get(epoch).is_some_and(|&hw| cid <= hw)
+    /// True if `ord` was already durably appended (so a resend or a replayed
+    /// phrase must be skipped, not re-applied). Ordinals are monotonic per
+    /// session, so this is a high-water compare.
+    pub fn is_applied(&self, ord: u64) -> bool {
+        ord <= self.applied_ord
+    }
+
+    /// The highest applied ordinal, reported to the provider on session-open so
+    /// it can seed its counter (resume without replay) — and which a replay's
+    /// re-numbering must reach before the daemon appends anything new.
+    pub fn high_water_ord(&self) -> u64 {
+        self.applied_ord
     }
 
     pub fn append(
         &mut self,
         payload: Payload,
         turn: TurnId,
-        dedup: Option<(String, u64)>,
+        ord: Option<u64>,
     ) -> std::io::Result<Seq> {
         let seq = self.next_seq;
         let rec = Record {
@@ -84,7 +84,7 @@ impl ReplayLog {
                 turn,
                 payload,
             },
-            dedup: dedup.clone(),
+            ord,
         };
         let mut body = Vec::new();
         ciborium::into_writer(&rec, &mut body).expect("cbor encode is infallible for Record");
@@ -92,10 +92,9 @@ impl ReplayLog {
         self.file.write_all(&body)?;
         self.file.flush()?;
         self.next_seq += 1;
-        if let Some((epoch, cid)) = dedup {
-            let hw = self.applied.entry(epoch).or_insert(0);
-            if cid > *hw {
-                *hw = cid;
+        if let Some(ord) = ord {
+            if ord > self.applied_ord {
+                self.applied_ord = ord;
             }
         }
         Ok(seq)
@@ -134,13 +133,9 @@ impl ReplayLog {
             if r.read_exact(&mut body).is_err() {
                 break; // torn trailing record -> ignore the tail
             }
-            // New records are `Record`; pre-dedup logs hold a bare `Update`.
-            if let Ok(rec) = ciborium::from_reader::<Record, _>(&body[..]) {
-                out.push(rec);
-            } else if let Ok(update) = ciborium::from_reader::<Update, _>(&body[..]) {
-                out.push(Record { update, dedup: None });
-            } else {
-                break; // torn/garbled record -> ignore the tail
+            match ciborium::from_reader::<Record, _>(&body[..]) {
+                Ok(rec) => out.push(rec),
+                Err(_) => break, // torn/garbled record -> ignore the tail
             }
         }
         Ok(out)
@@ -187,19 +182,19 @@ mod tests {
     }
 
     #[test]
-    fn dedup_high_water_survives_reopen() {
+    fn ord_high_water_survives_reopen() {
         let dir = tempfile::tempdir().unwrap();
         {
             let mut log = ReplayLog::open(dir.path(), "s").unwrap();
-            log.append(msg("a"), 1, Some(("e".into(), 5))).unwrap();
-            log.append(msg("b"), 1, Some(("e".into(), 7))).unwrap();
+            log.append(msg("a"), 1, Some(5)).unwrap();
+            log.append(msg("b"), 1, Some(7)).unwrap();
         }
-        // Reopened from disk: the epoch high-water is rebuilt from the records.
+        // Reopened from disk: the ordinal high-water is rebuilt from the records.
         let log = ReplayLog::open(dir.path(), "s").unwrap();
-        assert!(log.is_applied("e", 5));
-        assert!(log.is_applied("e", 7));
-        assert!(!log.is_applied("e", 8), "cid past high-water is not yet applied");
-        assert!(!log.is_applied("other", 1), "unknown epoch is not applied");
+        assert_eq!(log.high_water_ord(), 7);
+        assert!(log.is_applied(5));
+        assert!(log.is_applied(7));
+        assert!(!log.is_applied(8), "ordinal past high-water is not yet applied");
     }
 
     #[test]

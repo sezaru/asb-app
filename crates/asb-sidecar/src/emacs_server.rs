@@ -77,6 +77,13 @@ fn claim_result_line(cid: u64, granted: bool) -> String {
     format!("{{\"t\":\"claim-result\",\"cid\":{cid},\"granted\":{granted}}}")
 }
 
+/// Report a session's persisted ordinal high-water after a `session-open`, so
+/// the provider seeds its per-session dedup counter.
+fn session_hw_line(session: &str, hw: u64) -> String {
+    let session = serde_json::to_string(session).unwrap_or_else(|_| "\"\"".into());
+    format!("{{\"t\":\"session-hw\",\"session\":{session},\"hw\":{hw}}}")
+}
+
 /// Monotonic id per Emacs-server connection, so the registry can free the
 /// sessions a dropped connection owned.
 static NEXT_CONN: AtomicU64 = AtomicU64::new(1);
@@ -118,15 +125,24 @@ async fn handle_conn(conn: u64, stream: UnixStream, reg: Arc<Registry>, owners: 
                 continue;
             }
             Ok(msg) => {
+                let mut opened: Option<SessionId> = None;
                 if let EmacsIn::SessionOpen { session, .. } = &msg {
                     owners
                         .lock()
                         .unwrap()
                         .insert(session.clone(), line_tx.clone());
                     mine.push(session.clone());
+                    opened = Some(session.clone());
                 }
                 match reg.handle_emacs(conn, msg).await {
                     Ok(()) => {
+                        // Report the session's persisted ordinal high-water so the
+                        // provider seeds its counter (resume without replay) and
+                        // knows how far a replay must re-number before appending.
+                        if let Some(session) = opened {
+                            let hw = reg.high_water(&session);
+                            let _ = line_tx.send(session_hw_line(&session, hw));
+                        }
                         if let Some(c) = cid {
                             let _ = line_tx.send(ack_line(c));
                         }
@@ -182,6 +198,18 @@ mod tests {
         String::from_utf8(buf).unwrap()
     }
 
+    /// Read lines until one contains `needle`, skipping unrelated frames (e.g.
+    /// the `session-hw` a session-open now emits ahead of an ack).
+    async fn read_until(s: &mut UnixStream, needle: &str) -> String {
+        for _ in 0..10 {
+            let line = read_one_line(s).await;
+            if line.contains(needle) {
+                return line;
+            }
+        }
+        panic!("never saw a line containing {needle}");
+    }
+
     #[tokio::test]
     async fn emacs_socket_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
@@ -206,6 +234,10 @@ mod tests {
         }
         assert_eq!(reg.last_seq("s"), 1);
 
+        // session-open replies session-hw (high-water 0 for a fresh session).
+        let hw = read_until(&mut cli, "\"t\":\"session-hw\"").await;
+        assert!(hw.contains("\"hw\":0"), "got {hw}");
+
         out_tx
             .send(EmacsOut::Inject {
                 session: "s".into(),
@@ -213,7 +245,7 @@ mod tests {
             })
             .await
             .unwrap();
-        let line = read_one_line(&mut cli).await;
+        let line = read_until(&mut cli, "\"t\":\"inject\"").await;
         assert!(line.contains("\"t\":\"inject\""), "got {line}");
     }
 
@@ -253,7 +285,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cid_is_acked_and_resend_is_deduped() {
+    async fn cid_is_acked_and_msg_deduped_by_ord() {
         let dir = tempfile::tempdir().unwrap();
         let sock = dir.path().join("asb.sock");
         let reg = Arc::new(Registry::new(dir.path().to_path_buf()));
@@ -261,18 +293,16 @@ mod tests {
         let _srv = spawn_emacs_server(sock.clone(), reg.clone(), out_rx).unwrap();
 
         let mut cli = UnixStream::connect(&sock).await.unwrap();
-        cli.write_all(b"{\"t\":\"session-open\",\"session\":\"s\",\"title\":\"t\",\"cid\":1,\"epoch\":\"e\"}\n")
+        cli.write_all(b"{\"t\":\"session-open\",\"session\":\"s\",\"title\":\"t\",\"cid\":1}\n")
             .await
             .unwrap();
-        // A msg carrying cid=2; the provider must see an ack for it.
-        let msg = b"{\"t\":\"msg\",\"session\":\"s\",\"seq\":0,\"turn\":0,\"payload\":{\"type\":\"agent_message\",\"text\":\"hi\"},\"cid\":2,\"epoch\":\"e\"}\n";
+        // A msg carrying ord=1 (dedup key) and cid=2 (ack correlation).
+        let msg = b"{\"t\":\"msg\",\"session\":\"s\",\"seq\":0,\"turn\":0,\"payload\":{\"type\":\"agent_message\",\"text\":\"hi\"},\"ord\":1,\"cid\":2}\n";
         cli.write_all(msg).await.unwrap();
 
-        // Two acks come back (cid 1 then 2); one msg landed.
-        let a1 = read_one_line(&mut cli).await;
-        let a2 = read_one_line(&mut cli).await;
-        assert!(a1.contains("\"t\":\"ack\"") && a1.contains("\"cid\":1"), "got {a1}");
-        assert!(a2.contains("\"cid\":2"), "got {a2}");
+        // The cid ack rides through for both the session-open (1) and the msg (2).
+        assert!(read_until(&mut cli, "\"cid\":1").await.contains("\"t\":\"ack\""));
+        assert!(read_until(&mut cli, "\"cid\":2").await.contains("\"t\":\"ack\""));
         for _ in 0..100 {
             if reg.last_seq("s") == 1 {
                 break;
@@ -281,11 +311,26 @@ mod tests {
         }
         assert_eq!(reg.last_seq("s"), 1);
 
-        // Resend the SAME cid=2: it is acked again but NOT re-appended.
-        cli.write_all(msg).await.unwrap();
-        let a3 = read_one_line(&mut cli).await;
-        assert!(a3.contains("\"cid\":2"), "got {a3}");
+        // Resend the same ord=1 under a DIFFERENT cid=3: acked, but dedup is by
+        // ord, so it is NOT re-appended (a resume replaying the phrase, too).
+        cli.write_all(b"{\"t\":\"msg\",\"session\":\"s\",\"seq\":0,\"turn\":0,\"payload\":{\"type\":\"agent_message\",\"text\":\"hi\"},\"ord\":1,\"cid\":3}\n")
+            .await
+            .unwrap();
+        assert!(read_until(&mut cli, "\"cid\":3").await.contains("\"t\":\"ack\""));
         tokio::time::sleep(Duration::from_millis(50)).await;
-        assert_eq!(reg.last_seq("s"), 1, "resent cid must not duplicate");
+        assert_eq!(reg.last_seq("s"), 1, "resent ordinal must not duplicate");
+
+        // A new ord=2 lands.
+        cli.write_all(b"{\"t\":\"msg\",\"session\":\"s\",\"seq\":0,\"turn\":0,\"payload\":{\"type\":\"agent_message\",\"text\":\"bye\"},\"ord\":2,\"cid\":4}\n")
+            .await
+            .unwrap();
+        assert!(read_until(&mut cli, "\"cid\":4").await.contains("\"t\":\"ack\""));
+        for _ in 0..100 {
+            if reg.last_seq("s") == 2 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(reg.last_seq("s"), 2);
     }
 }

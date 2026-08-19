@@ -15,13 +15,12 @@ pub enum EmacsIn {
         seq: Seq,
         turn: TurnId,
         payload: Payload,
-        /// At-least-once dedup key, from the provider's outbox. `cid` is
-        /// monotonic within an `epoch` (one provider process lifetime); a
-        /// resent `cid <= applied` is skipped, not re-appended.
+        /// Per-session provider ordinal: the dedup key. The provider numbers a
+        /// session's phrases 1,2,3… in stable order and replays them with the
+        /// same ordinals on resume, so `ord <= high-water` is skipped (dedup +
+        /// semantic re-mirror suppression) and only the new tail is appended.
         #[serde(default)]
-        cid: Option<u64>,
-        #[serde(default)]
-        epoch: Option<String>,
+        ord: Option<u64>,
     },
     Status {
         session: SessionId,
