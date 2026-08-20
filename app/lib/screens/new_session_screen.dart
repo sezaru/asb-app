@@ -14,22 +14,32 @@ class NewSessionScreen extends StatefulWidget {
 
 class _NewSessionScreenState extends State<NewSessionScreen> {
   final _prompt = TextEditingController();
+  final _cwd = TextEditingController();
+  bool _starting = false;
 
   @override
   void dispose() {
     _prompt.dispose();
+    _cwd.dispose();
     super.dispose();
   }
 
-  void _start() {
-    if (_prompt.text.trim().isEmpty) return;
-    // The protocol mirrors sessions created in Emacs; phone-initiated creation
-    // isn't carried yet. Surface that honestly rather than dropping the tap.
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text(
-          'Starting a session from the phone isn’t wired to the sidecar yet — '
-          'open it in Emacs and it mirrors here.'),
-    ));
+  Future<void> _start() async {
+    final text = _prompt.text.trim();
+    if (text.isEmpty || _starting) return;
+    setState(() => _starting = true);
+    final cwd = _cwd.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await widget.conn.createSession(text, cwd: cwd.isEmpty ? null : cwd);
+      messenger.showSnackBar(SnackBar(
+          content: Text('Starting a session on ${widget.hostName}…')));
+      navigator.pop();
+    } catch (e) {
+      if (mounted) setState(() => _starting = false);
+      messenger.showSnackBar(SnackBar(content: Text('Could not start: $e')));
+    }
   }
 
   @override
@@ -83,19 +93,35 @@ class _NewSessionScreenState extends State<NewSessionScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const SectionLabel('RECENT'),
-                  const SizedBox(height: 8),
-                  for (final r in const [
-                    'Add pagination to the sessions endpoint',
-                    'Why is the relay dropping every 90 seconds?',
-                  ]) ...[
-                    _RecentChip(text: r, onTap: () => _prompt.text = r),
-                    const SizedBox(height: 7),
-                  ],
-                  const SizedBox(height: 2),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Text('Working directory (optional)',
+                        style: ui(12, color: p.text.withValues(alpha: 0.7))),
+                  ),
+                  TextField(
+                    controller: _cwd,
+                    style: ui(14, color: p.text),
+                    cursorColor: p.accent,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: '~/projects/api  (blank = host home)',
+                      hintStyle: ui(14, color: p.n600),
+                      filled: true,
+                      fillColor: p.surface,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: p.divider)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: p.accent)),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   NButton(
-                    label: 'Start the session',
-                    onTap: _start,
+                    label: _starting ? 'Starting…' : 'Start the session',
+                    onTap: _starting ? null : _start,
                     kind: BtnKind.primary,
                     block: true,
                     minHeight: 52,
@@ -111,24 +137,3 @@ class _NewSessionScreenState extends State<NewSessionScreen> {
   }
 }
 
-class _RecentChip extends StatelessWidget {
-  final String text;
-  final VoidCallback onTap;
-  const _RecentChip({required this.text, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final p = context.p;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: p.n800),
-        ),
-        child: Text(text, style: ui(12.5, color: p.n300, height: 1.45)),
-      ),
-    );
-  }
-}

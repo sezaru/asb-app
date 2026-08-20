@@ -32,6 +32,19 @@ pub struct Registry {
     _active_keepalive: watch::Receiver<usize>,
 }
 
+/// A session title from its first prompt: first line, trimmed, capped so a long
+/// prompt doesn't bloat the list.
+fn title_hint(prompt: &str) -> String {
+    let line = prompt.lines().next().unwrap_or("").trim();
+    if line.chars().count() > 80 {
+        format!("{}…", line.chars().take(79).collect::<String>())
+    } else if line.is_empty() {
+        "session".to_string()
+    } else {
+        line.to_string()
+    }
+}
+
 struct SessionEntry {
     log: ReplayLog,
     title: String,
@@ -193,15 +206,7 @@ impl Registry {
                     // Announce the new session to phones already connected, so it
                     // shows its title right away (a fresh connect learns it via the
                     // hello SessionList instead).
-                    let metas = sessions
-                        .iter()
-                        .map(|(id, e)| SessionMeta {
-                            id: id.clone(),
-                            title: e.title.clone(),
-                            state: e.state,
-                            last_seq: e.log.last_seq(),
-                        })
-                        .collect();
+                    let metas = self.metas_locked(&sessions);
                     let _ = self.tx.send(WireMsg::SessionList { sessions: metas });
                 }
                 let _ = self.active_tx.send(sessions.len());
@@ -264,6 +269,11 @@ impl Registry {
                 self.claims.lock().unwrap().remove(&session);
                 self.pending_perms.lock().unwrap().retain(|(s, _)| s != &session);
                 let _ = self.active_tx.send(sessions.len());
+                // Re-publish the full list so phones flip the just-closed session
+                // to open:false (resumable) rather than dropping it — its log is
+                // still on disk.
+                let metas = self.metas_locked(&sessions);
+                let _ = self.tx.send(WireMsg::SessionList { sessions: metas });
             }
             EmacsIn::Config { session, config } => {
                 if let Some(entry) = sessions.get_mut(&session) {
@@ -313,8 +323,82 @@ impl Registry {
                 title: e.title.clone(),
                 state: e.state,
                 last_seq: e.log.last_seq(),
+                open: true,
             })
             .collect()
+    }
+
+    /// Every open session plus every closed session the host still has a log
+    /// for (marked `open: false`), so the phone can list closed sessions as
+    /// resumable. Sent in the connect burst and re-sent whenever a session
+    /// opens or closes.
+    pub fn full_session_list(&self) -> Vec<SessionMeta> {
+        let sessions = self.sessions.lock().unwrap();
+        self.metas_locked(&sessions)
+    }
+
+    /// Build the open+closed metadata list from an already-held sessions guard
+    /// (so callers inside `handle_emacs` don't re-lock and deadlock).
+    fn metas_locked(&self, sessions: &HashMap<SessionId, SessionEntry>) -> Vec<SessionMeta> {
+        let open_ids: HashSet<SessionId> = sessions.keys().cloned().collect();
+        let mut metas: Vec<SessionMeta> = sessions
+            .iter()
+            .map(|(id, e)| SessionMeta {
+                id: id.clone(),
+                title: e.title.clone(),
+                state: e.state,
+                last_seq: e.log.last_seq(),
+                open: true,
+            })
+            .collect();
+        metas.extend(self.closed_metas(&open_ids));
+        metas
+    }
+
+    /// Scan the log directory for sessions not in `open_ids` and describe each
+    /// as resumable metadata: title = its first user prompt (first line,
+    /// truncated), last_seq from the log. Skips empty/garbled logs.
+    fn closed_metas(&self, open_ids: &HashSet<SessionId>) -> Vec<SessionMeta> {
+        let mut out = Vec::new();
+        let rd = match std::fs::read_dir(&self.dir) {
+            Ok(r) => r,
+            Err(_) => return out,
+        };
+        for ent in rd.flatten() {
+            let path = ent.path();
+            let Some(session) = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| n.strip_suffix(".log"))
+            else {
+                continue;
+            };
+            if open_ids.contains(session) {
+                continue;
+            }
+            let Ok(log) = ReplayLog::open(&self.dir, session) else {
+                continue;
+            };
+            let updates = log.read_since(0).unwrap_or_default();
+            if updates.is_empty() {
+                continue;
+            }
+            let title = updates
+                .iter()
+                .find_map(|u| match &u.payload {
+                    Payload::UserMessage { text } => Some(text.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "session".to_string());
+            out.push(SessionMeta {
+                id: session.to_string(),
+                title: title_hint(&title),
+                state: SessionState::Idle,
+                last_seq: log.last_seq(),
+                open: false,
+            });
+        }
+        out
     }
 
     /// Every session's stored config, for the initial burst to a connecting
@@ -335,6 +419,23 @@ impl Registry {
         match sessions.get(session) {
             Some(e) => Ok(e.log.read_since(since)?),
             None => Ok(vec![]),
+        }
+    }
+
+    /// Read a session's persisted transcript straight from its on-disk log,
+    /// whether or not it's currently open — a resumed (closed) session is not in
+    /// the map, so `read_since` would return nothing. Used to replay its backlog
+    /// to the phone that reopened it.
+    pub fn read_log_since(&self, session: &str, since: Seq) -> anyhow::Result<Vec<Update>> {
+        {
+            let sessions = self.sessions.lock().unwrap();
+            if let Some(e) = sessions.get(session) {
+                return Ok(e.log.read_since(since)?);
+            }
+        }
+        match ReplayLog::open(&self.dir, session) {
+            Ok(log) => Ok(log.read_since(since)?),
+            Err(_) => Ok(vec![]),
         }
     }
 }
@@ -452,6 +553,53 @@ mod tests {
             other => panic!("expected Update, got {other:?}"),
         }
         assert_eq!(reg.read_since("s", 0).unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn closed_session_listed_as_resumable() {
+        let dir = tempfile::tempdir().unwrap();
+        let reg = Registry::new(dir.path().to_path_buf());
+        reg.handle_emacs(0, EmacsIn::SessionOpen { session: "s".into(), title: "t".into() })
+            .await
+            .unwrap();
+        // A user prompt becomes the resumable title once the session closes.
+        reg.handle_emacs(0, EmacsIn::Msg {
+            session: "s".into(),
+            seq: 0,
+            turn: 0,
+            payload: Payload::UserMessage { text: "fix the flaky test\nmore".into() },
+            ord: None,
+        })
+        .await
+        .unwrap();
+
+        // Open: present and open=true; no closed entries yet.
+        let open = reg.full_session_list();
+        assert_eq!(open.len(), 1);
+        assert!(open[0].open);
+
+        reg.handle_emacs(0, EmacsIn::SessionClose { session: "s".into() })
+            .await
+            .unwrap();
+
+        // Closed: still listed, now open=false, title = first line of the prompt.
+        let after = reg.full_session_list();
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].id, "s");
+        assert!(!after[0].open);
+        assert_eq!(after[0].title, "fix the flaky test");
+
+        // A resuming phone can still read the closed session's transcript off
+        // disk (it's gone from the in-memory map), so its backlog can be
+        // replayed instead of showing an empty history.
+        let backlog = reg.read_log_since("s", 0).unwrap();
+        assert_eq!(backlog.len(), 1);
+        assert!(matches!(
+            &backlog[0].payload,
+            Payload::UserMessage { text } if text.starts_with("fix the flaky test")
+        ));
+        // In-map read returns nothing for the closed session (regression guard).
+        assert!(reg.read_since("s", 0).unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -2056013984;
+  int get rustContentHash => 493897967;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -138,10 +138,22 @@ abstract class RustLibApi extends BaseApi {
     required String session,
   });
 
+  Future<void> crateApiClientRustSessionNewSession({
+    required RustSession that,
+    required BigInt req,
+    required String prompt,
+    String? cwd,
+  });
+
+  Future<void> crateApiClientRustSessionOpenSession({
+    required RustSession that,
+    required String session,
+  });
+
   Future<void> crateApiClientRustSessionUploadChunk({
     required RustSession that,
     required BigInt req,
-    required String dataB64,
+    required List<int> data,
   });
 
   Future<void> crateApiClientRustSessionUploadFinish({
@@ -671,10 +683,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<void> crateApiClientRustSessionUploadChunk({
+  Future<void> crateApiClientRustSessionNewSession({
     required RustSession that,
     required BigInt req,
-    required String dataB64,
+    required String prompt,
+    String? cwd,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -685,7 +698,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_64(req, serializer);
-          sse_encode_String(dataB64, serializer);
+          sse_encode_String(prompt, serializer);
+          sse_encode_opt_String(cwd, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -697,8 +711,86 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
+        constMeta: kCrateApiClientRustSessionNewSessionConstMeta,
+        argValues: [that, req, prompt, cwd],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionNewSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_new_session",
+        argNames: ["that", "req", "prompt", "cwd"],
+      );
+
+  @override
+  Future<void> crateApiClientRustSessionOpenSession({
+    required RustSession that,
+    required String session,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_String(session, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionOpenSessionConstMeta,
+        argValues: [that, session],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionOpenSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_open_session",
+        argNames: ["that", "session"],
+      );
+
+  @override
+  Future<void> crateApiClientRustSessionUploadChunk({
+    required RustSession that,
+    required BigInt req,
+    required List<int> data,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_u_64(req, serializer);
+          sse_encode_list_prim_u_8_loose(data, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
         constMeta: kCrateApiClientRustSessionUploadChunkConstMeta,
-        argValues: [that, req, dataB64],
+        argValues: [that, req, data],
         apiImpl: this,
       ),
     );
@@ -707,7 +799,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiClientRustSessionUploadChunkConstMeta =>
       const TaskConstMeta(
         debugName: "RustSession_upload_chunk",
-        argNames: ["that", "req", "dataB64"],
+        argNames: ["that", "req", "data"],
       );
 
   @override
@@ -727,7 +819,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 17,
             port: port_,
           );
         },
@@ -767,7 +859,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 18,
             port: port_,
           );
         },
@@ -1066,6 +1158,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as List<int>;
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
@@ -1180,13 +1278,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SessionMetaDto dco_decode_session_meta_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return SessionMetaDto(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
       running: dco_decode_bool(arr[2]),
       lastSeq: dco_decode_u_64(arr[3]),
+      open: dco_decode_bool(arr[4]),
     );
   }
 
@@ -1570,6 +1669,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -1713,11 +1819,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_title = sse_decode_String(deserializer);
     var var_running = sse_decode_bool(deserializer);
     var var_lastSeq = sse_decode_u_64(deserializer);
+    var var_open = sse_decode_bool(deserializer);
     return SessionMetaDto(
       id: var_id,
       title: var_title,
       running: var_running,
       lastSeq: var_lastSeq,
+      open: var_open,
     );
   }
 
@@ -2099,6 +2207,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_prim_u_8_loose(
+    List<int> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint8List(
+      self is Uint8List ? self : Uint8List.fromList(self),
+    );
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -2233,6 +2353,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.title, serializer);
     sse_encode_bool(self.running, serializer);
     sse_encode_u_64(self.lastSeq, serializer);
+    sse_encode_bool(self.open, serializer);
   }
 
   @protected
@@ -2394,12 +2515,33 @@ class RustSessionImpl extends RustOpaque implements RustSession {
   Future<void> interrupt({required String session}) => RustLib.instance.api
       .crateApiClientRustSessionInterrupt(that: this, session: session);
 
-  /// Send one base64-encoded slice of the upload under `req`.
-  Future<void> uploadChunk({required BigInt req, required String dataB64}) =>
+  /// Start a brand-new session on the host from `prompt` (its first message
+  /// and title). `cwd` is an optional host directory (pick one via `fs_list`).
+  /// The new session mirrors back through the event stream — a fresh
+  /// `Sessions` list with an added open entry, then its updates.
+  Future<void> newSession({
+    required BigInt req,
+    required String prompt,
+    String? cwd,
+  }) => RustLib.instance.api.crateApiClientRustSessionNewSession(
+    that: this,
+    req: req,
+    prompt: prompt,
+    cwd: cwd,
+  );
+
+  /// Reopen a closed session (one with `SessionMetaDto::open == false`) by id.
+  /// It resumes on the host and mirrors back like any live session.
+  Future<void> openSession({required String session}) => RustLib.instance.api
+      .crateApiClientRustSessionOpenSession(that: this, session: session);
+
+  /// Send one raw byte slice of the upload under `req` (Dart passes a
+  /// `Uint8List`; no base64 on the wire).
+  Future<void> uploadChunk({required BigInt req, required List<int> data}) =>
       RustLib.instance.api.crateApiClientRustSessionUploadChunk(
         that: this,
         req: req,
-        dataB64: dataB64,
+        data: data,
       );
 
   /// Seal the upload under `req`; the host replies `UploadDone` with the path.

@@ -109,6 +109,14 @@ impl PhoneClient {
         self.send_msg(&WireMsg::UploadFinish { req }).await
     }
 
+    pub async fn new_session(&mut self, req: u64, prompt: &str, cwd: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::NewSession { req, prompt: prompt.into(), cwd }).await
+    }
+
+    pub async fn open_session(&mut self, session: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::OpenSession { session: session.into() }).await
+    }
+
     /// Split into independent send/receive halves sharing the connection, so a
     /// receive loop and outbound sends run in separate tasks. A `select!` over
     /// one stream's read + write would cancel a half-read frame and corrupt it;
@@ -216,6 +224,14 @@ impl PhoneSender {
 
     pub async fn upload_finish(&mut self, req: u64) -> anyhow::Result<()> {
         self.send_msg(&WireMsg::UploadFinish { req }).await
+    }
+
+    pub async fn new_session(&mut self, req: u64, prompt: &str, cwd: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::NewSession { req, prompt: prompt.into(), cwd }).await
+    }
+
+    pub async fn open_session(&mut self, session: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::OpenSession { session: session.into() }).await
     }
 }
 

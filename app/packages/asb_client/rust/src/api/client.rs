@@ -184,6 +184,20 @@ impl RustSession {
     pub async fn upload_finish(&self, req: u64) -> anyhow::Result<()> {
         self.sender.lock().await.upload_finish(req).await
     }
+
+    /// Start a brand-new session on the host from `prompt` (its first message
+    /// and title). `cwd` is an optional host directory (pick one via `fs_list`).
+    /// The new session mirrors back through the event stream — a fresh
+    /// `Sessions` list with an added open entry, then its updates.
+    pub async fn new_session(&self, req: u64, prompt: String, cwd: Option<String>) -> anyhow::Result<()> {
+        self.sender.lock().await.new_session(req, &prompt, cwd).await
+    }
+
+    /// Reopen a closed session (one with `SessionMetaDto::open == false`) by id.
+    /// It resumes on the host and mirrors back like any live session.
+    pub async fn open_session(&self, session: String) -> anyhow::Result<()> {
+        self.sender.lock().await.open_session(&session).await
+    }
 }
 
 /// A per-session catch-up high-water mark passed to `hello`.
@@ -247,6 +261,9 @@ pub struct SessionMetaDto {
     pub title: String,
     pub running: bool,
     pub last_seq: u64,
+    /// True for a live/mirrored session; false for a closed one the host still
+    /// has a log for — the phone lists these as resumable via `open_session`.
+    pub open: bool,
 }
 
 pub struct UpdateDto {
@@ -400,6 +417,7 @@ fn map_meta(m: SessionMeta) -> SessionMetaDto {
         title: m.title,
         running: matches!(m.state, asb_protocol::model::SessionState::Running),
         last_seq: m.last_seq,
+        open: m.open,
     }
 }
 

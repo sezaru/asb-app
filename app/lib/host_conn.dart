@@ -25,6 +25,9 @@ void _trace(String msg) {
 class SessionData {
   String title;
   bool running;
+  // False for a session the host still has a log for but which is closed in
+  // Emacs. Listed as resumable; reopened via `HostConn.openSession`.
+  bool open;
   BigInt lastSeq;
   final List<UpdateDto> updates = [];
   // Real sidecar seqs already applied — guards against duplicates when a
@@ -35,7 +38,11 @@ class SessionData {
   // until the host sends its first Config for this session; the header pickers
   // and the composer's command autocomplete read straight off it.
   SessionConfigDto? config;
-  SessionData({required this.title, this.running = false, BigInt? lastSeq})
+  SessionData(
+      {required this.title,
+      this.running = false,
+      this.open = true,
+      BigInt? lastSeq})
       : lastSeq = lastSeq ?? BigInt.zero;
 }
 
@@ -97,6 +104,18 @@ class HostConn extends ChangeNotifier {
 
   List<SessionData> get sessionList => sessions.values.toList();
 
+  /// Live (mirrored) sessions — the main list.
+  List<SessionData> get openSessions =>
+      sessions.values.where((s) => s.open).toList();
+
+  /// Closed sessions the host can still reopen, newest-seq first. `key` is the
+  /// session id to pass to [openSession].
+  List<MapEntry<String, SessionData>> get closedSessions {
+    final cs = sessions.entries.where((e) => !e.value.open).toList();
+    cs.sort((a, b) => b.value.lastSeq.compareTo(a.value.lastSeq));
+    return cs;
+  }
+
   Future<void> connect() async {
     if (_disposed) return;
     _retry?.cancel();
@@ -153,6 +172,7 @@ class HostConn extends ChangeNotifier {
           final s = _bucket(m.id, m.title);
           s.title = m.title;
           s.running = m.running;
+          s.open = m.open;
           s.lastSeq = m.lastSeq;
         }
       case HostEventDto_Update(:final field0):
@@ -203,6 +223,27 @@ class HostConn extends ChangeNotifier {
 
   Future<void> interrupt(String sessionId) async =>
       _session?.interrupt(session: sessionId);
+
+  /// Start a brand-new session on the host from `prompt` (its first message and
+  /// title). `cwd` is an optional host directory; null runs in the host default.
+  /// The session mirrors back — a fresh Sessions list with the new open entry,
+  /// then its updates.
+  Future<void> createSession(String prompt, {String? cwd}) async {
+    final t = prompt.trim();
+    if (t.isEmpty) return;
+    final req = (_nextReq += BigInt.one);
+    // Badge our own first prompt when its mirror echoes back, like `send`.
+    _pendingSent.add(t);
+    _trace('ASBNEW len=${t.length} cwd=$cwd');
+    await _session?.newSession(req: req, prompt: t, cwd: cwd);
+  }
+
+  /// Reopen a closed session (from [closedSessions]) by id; it resumes on the
+  /// host and mirrors back like any live session.
+  Future<void> openSession(String sessionId) async {
+    _trace('ASBOPEN sess=$sessionId');
+    await _session?.openSession(session: sessionId);
+  }
 
   Future<void> answer(PermissionReqDto p, String option) async {
     await _session?.answerPermission(session: p.session, id: p.id, option: option);

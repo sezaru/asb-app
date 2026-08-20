@@ -1,6 +1,3 @@
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
@@ -106,44 +103,29 @@ class _SessionsScreenState extends State<SessionsScreen> {
       case ConnStatus.down:
         return _down(p, name);
       case ConnStatus.connected:
-        final list = _conn!.sessionList;
+        final open = _conn!.openSessions;
+        final closed = _conn!.closedSessions;
         // Connected, but the first session snapshot hasn't landed yet — don't
         // flash "nothing here" before we know what the host actually has.
-        if (list.isEmpty && !_conn!.sessionsLoaded) {
+        if (open.isEmpty && closed.isEmpty && !_conn!.sessionsLoaded) {
           return _loadingSessions(p, name);
         }
-        if (list.isEmpty) {
+        if (open.isEmpty && closed.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                EmptyState(
-                  icon: Icons.terminal,
-                  title: 'Nothing running here',
-                  body:
-                      '$name is connected but has no agent sessions. Start one in Emacs, or open one from here with a first prompt.',
-                  cta: 'Start a session',
-                  onCta: _newSession,
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: NButton(
-                    label: 'DEBUG upload test',
-                    onTap: _debugUpload,
-                    block: true,
-                    minHeight: 46,
-                    dashed: true,
-                  ),
-                ),
-              ],
+            child: EmptyState(
+              icon: Icons.terminal,
+              title: 'Nothing running here',
+              body:
+                  '$name is connected but has no agent sessions. Start one in Emacs, or open one from here with a first prompt.',
+              cta: 'Start a session',
+              onCta: _newSession,
             ),
           );
         }
         return ListView(
           padding: const EdgeInsets.fromLTRB(11, 0, 11, 14),
           children: [
-            for (final s in list) ...[
+            for (final s in open) ...[
               _SessionCard(
                 data: s,
                 id: _idOf(s),
@@ -151,6 +133,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 onInterrupt: () => _conn!.interrupt(_idOf(s)),
               ),
               const SizedBox(height: 9),
+            ],
+            if (closed.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 3, bottom: 8),
+                child: SectionLabel('RESUMABLE'),
+              ),
+              for (final e in closed) ...[
+                _ClosedCard(
+                  title: e.value.title,
+                  onResume: () => _resume(e.key),
+                ),
+                const SizedBox(height: 9),
+              ],
             ],
             const SizedBox(height: 2),
             NButton(
@@ -166,6 +162,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
     }
   }
 
+  // Reopen a closed session on the host and jump into it; its history streams
+  // in as the host resumes.
+  void _resume(String id) {
+    _conn!.openSession(id);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => SessionScreen(conn: _conn!, sessionId: id),
+    ));
+  }
+
   String _idOf(SessionData s) =>
       _conn!.sessions.entries.firstWhere((e) => e.value == s).key;
 
@@ -176,35 +181,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
   void _newSession() => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => NewSessionScreen(conn: _conn!, hostName: AppScope.of(context).nicknameFor(widget.hostId)),
       ));
-
-  // DEBUG: build a 50MB file in the app's own private temp dir (no storage
-  // permissions needed) and upload it straight over the machine connection
-  // (no agent session) to measure real phone->host throughput.
-  Future<void> _debugUpload() async {
-    const mib = 50;
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final f = File('${Directory.systemTemp.path}/asbtest.bin');
-      if (!await f.exists() || await f.length() != mib * 1024 * 1024) {
-        messenger.showSnackBar(SnackBar(content: Text('building ${mib}MB test file…')));
-        final sink = f.openWrite();
-        final chunk = Uint8List(1024 * 1024);
-        for (var i = 0; i < mib; i++) {
-          sink.add(chunk);
-        }
-        await sink.close();
-      }
-      messenger.showSnackBar(SnackBar(content: Text('uploading ${mib}MB over 4G…')));
-      final sw = Stopwatch()..start();
-      final path = await _conn!.uploadFile('asbtest.bin', f.path);
-      sw.stop();
-      final mbps = (mib * 1000 / sw.elapsedMilliseconds).toStringAsFixed(2);
-      messenger.showSnackBar(SnackBar(
-          content: Text('done: ${mib}MB in ${sw.elapsedMilliseconds} ms = $mbps MB/s → $path')));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('upload failed: $e')));
-    }
-  }
 
   Widget _loadingSessions(Palette p, String name) {
     return Center(
@@ -396,6 +372,49 @@ class _SessionCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text('seq ${data.lastSeq} · ${id.length >= 8 ? id.substring(0, 8) : id}',
                   style: mono(10, color: p.n600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A closed session the host can reopen: title + a Resume affordance. Tapping
+/// resumes it on the host and jumps into its (streaming) transcript.
+class _ClosedCard extends StatelessWidget {
+  final String title;
+  final VoidCallback onResume;
+  const _ClosedCard({required this.title, required this.onResume});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.p;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onResume,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: p.bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.n800),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.history, size: 15, color: p.n500),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: ui(14, weight: FontWeight.w500, color: p.n300, height: 1.35)),
+              ),
+              const SizedBox(width: 8),
+              Text('RESUME',
+                  style: mono(10, weight: FontWeight.w500, color: p.a300, spacing: 1.0)),
             ],
           ),
         ),

@@ -73,6 +73,19 @@ pub enum EmacsOut {
     Interrupt {
         session: SessionId,
     },
+    /// Start a brand-new agent-shell session (no session id yet). Not routed to
+    /// a session owner — the sidecar hands it to a live Emacs, which spawns the
+    /// shell in `cwd` and submits `prompt` as the first message.
+    NewSession {
+        prompt: String,
+        cwd: Option<String>,
+    },
+    /// Resume an existing but currently-closed session by its stable ACP
+    /// session id. Like `NewSession`, delivered to a live Emacs rather than a
+    /// session owner (the session has none while closed).
+    ResumeSession {
+        session: SessionId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -84,7 +84,7 @@ async fn handle_phone_conn(
     send_wire(
         &mut send,
         &WireMsg::SessionList {
-            sessions: reg.session_list(),
+            sessions: reg.full_session_list(),
         },
     )
     .await?;
@@ -219,6 +219,20 @@ async fn handle_phone_conn(
                                 };
                                 send_wire(&mut send, &reply).await?;
                             }
+                            WireMsg::OpenSession { session } => {
+                                // The phone connected while this session was closed, so
+                                // its backlog was never replayed (hello's session_list is
+                                // open-only) and a host-side session/resume re-emits
+                                // phrases the sidecar dedups away. Push the persisted
+                                // transcript to THIS phone now, from its high-water (0 for
+                                // a never-replayed session), then route the resume to Emacs.
+                                let since = hw.get(&session).copied().unwrap_or(0);
+                                for u in reg.read_log_since(&session, since)? {
+                                    hw.insert(session.clone(), u.seq);
+                                    send_wire(&mut send, &WireMsg::Update(u)).await?;
+                                }
+                                let _ = out_tx.send(EmacsOut::ResumeSession { session }).await;
+                            }
                             other => handle_inbound(other, &reg, &out_tx).await,
                         }
                     }
@@ -281,6 +295,12 @@ async fn handle_inbound(m: WireMsg, reg: &Arc<Registry>, out_tx: &mpsc::Sender<E
             arg,
         } => Some(EmacsOut::Command { session, name, arg }),
         WireMsg::Interrupt { session } => Some(EmacsOut::Interrupt { session }),
+        // Phone-initiated session creation: no owning session yet, so it's
+        // delivered to a live Emacs (not routed by session id). The spawned
+        // session mirrors back through the normal path. (OpenSession is handled
+        // inline in the connection loop so it can replay the backlog to the phone
+        // that reopened it.)
+        WireMsg::NewSession { prompt, cwd, .. } => Some(EmacsOut::NewSession { prompt, cwd }),
         _ => None,
     };
     if let Some(ev) = ev {

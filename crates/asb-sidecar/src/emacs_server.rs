@@ -14,13 +14,19 @@ use crate::registry::Registry;
 
 /// session id -> line-writer of the connection that opened it.
 type Owners = Arc<Mutex<HashMap<SessionId, mpsc::UnboundedSender<String>>>>;
+/// conn id -> its line-writer, for events with no owning session (NewSession /
+/// ResumeSession): they're handed to one live Emacs, which spawns/resumes.
+type Conns = Arc<Mutex<HashMap<u64, mpsc::UnboundedSender<String>>>>;
 
-fn emacs_out_session(ev: &EmacsOut) -> SessionId {
+/// The owning session for a routed event, or None for session-less events that
+/// go to any live Emacs.
+fn emacs_out_session(ev: &EmacsOut) -> Option<SessionId> {
     match ev {
         EmacsOut::Inject { session, .. }
         | EmacsOut::Command { session, .. }
         | EmacsOut::PermissionResponse { session, .. }
-        | EmacsOut::Interrupt { session } => session.clone(),
+        | EmacsOut::Interrupt { session } => Some(session.clone()),
+        EmacsOut::NewSession { .. } | EmacsOut::ResumeSession { .. } => None,
     }
 }
 
@@ -34,17 +40,30 @@ pub fn spawn_emacs_server(
     let _ = std::fs::remove_file(&sock);
     let listener = UnixListener::bind(&sock)?;
     let owners: Owners = Arc::new(Mutex::new(HashMap::new()));
+    let conns: Conns = Arc::new(Mutex::new(HashMap::new()));
 
     {
         let owners = owners.clone();
+        let conns = conns.clone();
         tokio::spawn(async move {
             while let Some(ev) = out_rx.recv().await {
-                let session = emacs_out_session(&ev);
                 let line = match serde_json::to_string(&ev) {
                     Ok(l) => l,
                     Err(_) => continue,
                 };
-                let tx = owners.lock().unwrap().get(&session).cloned();
+                let tx = match emacs_out_session(&ev) {
+                    // Routed to the connection that owns the session.
+                    Some(session) => owners.lock().unwrap().get(&session).cloned(),
+                    // Session-less: hand it to the most-recently-connected live
+                    // Emacs (highest conn id), so a single Emacs — the common
+                    // case — spawns/resumes without duplicate work.
+                    None => conns
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .max_by_key(|(id, _)| **id)
+                        .map(|(_, tx)| tx.clone()),
+                };
                 if let Some(tx) = tx {
                     let _ = tx.send(line);
                 }
@@ -57,7 +76,7 @@ pub fn spawn_emacs_server(
             match listener.accept().await {
                 Ok((stream, _)) => {
                     let conn = NEXT_CONN.fetch_add(1, Ordering::Relaxed);
-                    tokio::spawn(handle_conn(conn, stream, reg.clone(), owners.clone()));
+                    tokio::spawn(handle_conn(conn, stream, reg.clone(), owners.clone(), conns.clone()));
                 }
                 Err(_) => break,
             }
@@ -88,9 +107,12 @@ fn session_hw_line(session: &str, hw: u64) -> String {
 /// sessions a dropped connection owned.
 static NEXT_CONN: AtomicU64 = AtomicU64::new(1);
 
-async fn handle_conn(conn: u64, stream: UnixStream, reg: Arc<Registry>, owners: Owners) {
+async fn handle_conn(conn: u64, stream: UnixStream, reg: Arc<Registry>, owners: Owners, conns: Conns) {
     let (read_half, mut write_half) = stream.into_split();
     let (line_tx, mut line_rx) = mpsc::unbounded_channel::<String>();
+    // Register this connection so session-less events (NewSession/ResumeSession)
+    // can be delivered even before it owns any session.
+    conns.lock().unwrap().insert(conn, line_tx.clone());
 
     tokio::spawn(async move {
         while let Some(line) = line_rx.recv().await {
@@ -171,6 +193,7 @@ async fn handle_conn(conn: u64, stream: UnixStream, reg: Arc<Registry>, owners: 
             }
         }
     }
+    conns.lock().unwrap().remove(&conn);
     // Free this connection's active sessions so the ref-count reflects the drop
     // (its Emacs closed or crashed); local unix sockets signal EOF promptly.
     reg.close_connection(conn);

@@ -71,8 +71,23 @@ abstract class RustSession implements RustOpaqueInterface {
 
   Future<void> interrupt({required String session});
 
-  /// Send one base64-encoded slice of the upload under `req`.
-  Future<void> uploadChunk({required BigInt req, required String dataB64});
+  /// Start a brand-new session on the host from `prompt` (its first message
+  /// and title). `cwd` is an optional host directory (pick one via `fs_list`).
+  /// The new session mirrors back through the event stream — a fresh
+  /// `Sessions` list with an added open entry, then its updates.
+  Future<void> newSession({
+    required BigInt req,
+    required String prompt,
+    String? cwd,
+  });
+
+  /// Reopen a closed session (one with `SessionMetaDto::open == false`) by id.
+  /// It resumes on the host and mirrors back like any live session.
+  Future<void> openSession({required String session});
+
+  /// Send one raw byte slice of the upload under `req` (Dart passes a
+  /// `Uint8List`; no base64 on the wire).
+  Future<void> uploadChunk({required BigInt req, required List<int> data});
 
   /// Seal the upload under `req`; the host replies `UploadDone` with the path.
   Future<void> uploadFinish({required BigInt req});
@@ -385,16 +400,25 @@ class SessionMetaDto {
   final bool running;
   final BigInt lastSeq;
 
+  /// True for a live/mirrored session; false for a closed one the host still
+  /// has a log for — the phone lists these as resumable via `open_session`.
+  final bool open;
+
   const SessionMetaDto({
     required this.id,
     required this.title,
     required this.running,
     required this.lastSeq,
+    required this.open,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^ title.hashCode ^ running.hashCode ^ lastSeq.hashCode;
+      id.hashCode ^
+      title.hashCode ^
+      running.hashCode ^
+      lastSeq.hashCode ^
+      open.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -404,7 +428,8 @@ class SessionMetaDto {
           id == other.id &&
           title == other.title &&
           running == other.running &&
-          lastSeq == other.lastSeq;
+          lastSeq == other.lastSeq &&
+          open == other.open;
 }
 
 class UpdateDto {

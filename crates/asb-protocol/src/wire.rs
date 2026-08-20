@@ -62,6 +62,22 @@ pub enum WireMsg {
     UploadFinish {
         req: u64,
     },
+    /// Start a brand-new agent session on the host from the phone. `prompt` is
+    /// the first message (also the session's title, as elsewhere); `cwd` is an
+    /// optional host directory to run it in (picked via the FS browser). There
+    /// is no session id yet — the host spawns one and it mirrors back through the
+    /// normal `SessionList`/`Update` path. `req` correlates a possible error.
+    NewSession {
+        req: u64,
+        prompt: String,
+        cwd: Option<String>,
+    },
+    /// Reopen an existing session the host still has a log for but which is not
+    /// currently open in Emacs (see `SessionMeta::open`). The host resumes it;
+    /// it then mirrors back like any live session.
+    OpenSession {
+        session: SessionId,
+    },
     // host -> phone
     SessionList {
         sessions: Vec<SessionMeta>,
@@ -117,6 +133,16 @@ pub struct SessionMeta {
     pub title: String,
     pub state: SessionState,
     pub last_seq: Seq,
+    /// True when the session is live in Emacs (mirrored). False for a session
+    /// the host still has a log for but which is closed — the phone lists these
+    /// as resumable and can reopen one with `OpenSession`. Defaults true so an
+    /// older peer that omits it is treated as open.
+    #[serde(default = "default_true")]
+    pub open: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -143,6 +169,36 @@ mod tests {
         ciborium::into_writer(&m, &mut buf).unwrap();
         let back: WireMsg = ciborium::from_reader(&buf[..]).unwrap();
         assert_eq!(m, back);
+    }
+
+    #[test]
+    fn wire_new_session_cbor_roundtrips() {
+        let m = WireMsg::NewSession {
+            req: 4,
+            prompt: "fix the auth test".into(),
+            cwd: Some("/home/me/proj".into()),
+        };
+        let mut buf = Vec::new();
+        ciborium::into_writer(&m, &mut buf).unwrap();
+        let back: WireMsg = ciborium::from_reader(&buf[..]).unwrap();
+        assert_eq!(m, back);
+    }
+
+    #[test]
+    fn session_meta_open_defaults_true() {
+        // A peer that predates `open` omits it; the field must decode as true.
+        let m = SessionMeta {
+            id: "s".into(),
+            title: "t".into(),
+            state: crate::model::SessionState::Idle,
+            last_seq: 3,
+            open: false,
+        };
+        let mut buf = Vec::new();
+        ciborium::into_writer(&m, &mut buf).unwrap();
+        let back: SessionMeta = ciborium::from_reader(&buf[..]).unwrap();
+        assert_eq!(m, back);
+        assert!(!back.open);
     }
 
     #[test]
