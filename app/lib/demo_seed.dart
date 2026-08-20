@@ -52,9 +52,9 @@ Map<String, SessionData> demoSessions() {
       ContentDto(kind: 'text', text: _searchHits),
     ])),
     _u(BigInt.from(805), const PayloadDto.plan(entries: [
-      'Reproduce the flake locally',
-      'Mint a token per test',
-      'Guard the assertion with waitFor',
+      PlanEntryDto(content: 'Reproduce the flake locally', status: 'completed'),
+      PlanEntryDto(content: 'Mint a token per test', status: 'in_progress'),
+      PlanEntryDto(content: 'Guard the assertion with waitFor', status: 'pending'),
     ])),
     _u(BigInt.from(806), const PayloadDto.toolCall(id: 't3', kind: 'edit', title: 'auth.test.ts', status: 'done', locations: [], content: [
       ContentDto(kind: 'diff', path: 'packages/api/test/auth.test.ts', diff: _diff),

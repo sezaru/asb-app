@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
@@ -104,15 +107,36 @@ class _SessionsScreenState extends State<SessionsScreen> {
         return _down(p, name);
       case ConnStatus.connected:
         final list = _conn!.sessionList;
+        // Connected, but the first session snapshot hasn't landed yet — don't
+        // flash "nothing here" before we know what the host actually has.
+        if (list.isEmpty && !_conn!.sessionsLoaded) {
+          return _loadingSessions(p, name);
+        }
         if (list.isEmpty) {
           return Center(
-            child: EmptyState(
-              icon: Icons.terminal,
-              title: 'Nothing running here',
-              body:
-                  '$name is connected but has no agent sessions. Start one in Emacs, or open one from here with a first prompt.',
-              cta: 'Start a session',
-              onCta: _newSession,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                EmptyState(
+                  icon: Icons.terminal,
+                  title: 'Nothing running here',
+                  body:
+                      '$name is connected but has no agent sessions. Start one in Emacs, or open one from here with a first prompt.',
+                  cta: 'Start a session',
+                  onCta: _newSession,
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: NButton(
+                    label: 'DEBUG upload test',
+                    onTap: _debugUpload,
+                    block: true,
+                    minHeight: 46,
+                    dashed: true,
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -152,6 +176,55 @@ class _SessionsScreenState extends State<SessionsScreen> {
   void _newSession() => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => NewSessionScreen(conn: _conn!, hostName: AppScope.of(context).nicknameFor(widget.hostId)),
       ));
+
+  // DEBUG: build a 50MB file in the app's own private temp dir (no storage
+  // permissions needed) and upload it straight over the machine connection
+  // (no agent session) to measure real phone->host throughput.
+  Future<void> _debugUpload() async {
+    const mib = 50;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final f = File('${Directory.systemTemp.path}/asbtest.bin');
+      if (!await f.exists() || await f.length() != mib * 1024 * 1024) {
+        messenger.showSnackBar(SnackBar(content: Text('building ${mib}MB test file…')));
+        final sink = f.openWrite();
+        final chunk = Uint8List(1024 * 1024);
+        for (var i = 0; i < mib; i++) {
+          sink.add(chunk);
+        }
+        await sink.close();
+      }
+      messenger.showSnackBar(SnackBar(content: Text('uploading ${mib}MB over 4G…')));
+      final sw = Stopwatch()..start();
+      final path = await _conn!.uploadFile('asbtest.bin', f.path);
+      sw.stop();
+      final mbps = (mib * 1000 / sw.elapsedMilliseconds).toStringAsFixed(2);
+      messenger.showSnackBar(SnackBar(
+          content: Text('done: ${mib}MB in ${sw.elapsedMilliseconds} ms = $mbps MB/s → $path')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('upload failed: $e')));
+    }
+  }
+
+  Widget _loadingSessions(Palette p, String name) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
+          ),
+          const SizedBox(height: 16),
+          Text('Loading sessions', style: ui(14.5, weight: FontWeight.w500, color: p.text)),
+          const SizedBox(height: 6),
+          Text('Fetching what $name is running',
+              style: mono(11, color: p.n500)),
+        ],
+      ),
+    );
+  }
 
   Widget _connecting(Palette p, String name) {
     return Padding(

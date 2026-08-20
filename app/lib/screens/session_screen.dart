@@ -1,5 +1,8 @@
 import 'package:asb_client/asb_client.dart';
+import 'package:extended_text_field/extended_text_field.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../host_conn.dart';
 import '../markdown.dart';
@@ -31,6 +34,15 @@ String _fmtTok(BigInt n) {
   return '$n';
 }
 
+/// Control char delimiting an attachment pill-chip in the composer's raw text.
+/// The user can't type it, so it never false-matches a real path.
+const String _attachFlag = '\u0001';
+final RegExp _attachRe = RegExp('\u0001([^\u0001]*)\u0001');
+
+/// Turn the composer's chip tokens (`path`) into `@path` for the wire.
+String _expandAttachments(String raw) =>
+    raw.replaceAllMapped(_attachRe, (m) => '@${m.group(1)}');
+
 class SessionScreen extends StatefulWidget {
   final HostConn conn;
   final String sessionId;
@@ -51,19 +63,45 @@ class _SessionScreenState extends State<SessionScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   bool _slash = false;
+  // Follow the stream only when already at the bottom — reading back through an
+  // earlier turn is never yanked down by new output. Recomputed from the layout
+  // *before* each conn update lands, then honoured after the frame settles.
+  bool _pinned = true;
 
   SessionData get _s =>
       widget.conn.sessions[widget.sessionId] ??
       SessionData(title: widget.sessionId);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.conn.addListener(_followStream);
+  }
+
+  void _followStream() {
+    if (_scroll.hasClients) {
+      final pos = _scroll.position;
+      _pinned = pos.maxScrollExtent - pos.pixels < 48;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pinned && _scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
+  }
 
   String? _firstText(List<ContentDto> content) {
     final c = content.where((c) => c.kind == 'text').firstOrNull;
     return c?.text;
   }
 
+  // The default is recomputed every build (never memoised) so a fold that opened
+  // because its turn was live collapses itself once the turn lands — an explicit
+  // tap, recorded in `_open`, outranks the live default either way.
   bool _foldOpen(String key, bool defOpen) {
-    _foldDefault.putIfAbsent(key, () => widget.expandAll ? true : defOpen);
-    return _open[key] ?? _foldDefault[key]!;
+    final d = widget.expandAll ? true : defOpen;
+    _foldDefault[key] = d;
+    return _open[key] ?? d;
   }
 
   void _toggle(String key) {
@@ -73,6 +111,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
   @override
   void dispose() {
+    widget.conn.removeListener(_followStream);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -114,8 +153,10 @@ class _SessionScreenState extends State<SessionScreen> {
   // ── Header band ──────────────────────────────────────────────────────────
   Widget _headerBand(Palette p, SessionData s) {
     final anyOpen = _open.values.any((v) => v);
+    // The 44×44 corner buttons sit flush to the edge (9px = 15 − their slack),
+    // while the title and breadcrumb keep the content margin of 15.
     return Container(
-      padding: const EdgeInsets.fromLTRB(15, 4, 15, 10),
+      padding: const EdgeInsets.fromLTRB(9, 4, 9, 10),
       decoration: BoxDecoration(
         color: p.band,
         border: Border(bottom: BorderSide(color: p.divider)),
@@ -130,12 +171,14 @@ class _SessionScreenState extends State<SessionScreen> {
                 onTap: () => Navigator.of(context).pop(),
                 color: p.n300,
               ),
-              const SizedBox(width: 3),
               Expanded(
-                child: Text(s.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: ui(15.5, weight: FontWeight.w500, color: p.text, spacing: -0.18)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
+                  child: Text(s.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ui(15.5, weight: FontWeight.w500, color: p.text, spacing: -0.18)),
+                ),
               ),
               NIconButton(
                 icon: anyOpen ? Icons.unfold_less : Icons.unfold_more,
@@ -145,7 +188,10 @@ class _SessionScreenState extends State<SessionScreen> {
               ),
             ],
           ),
-          _breadcrumb(p, s),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _breadcrumb(p, s),
+          ),
         ],
       ),
     );
@@ -172,6 +218,7 @@ class _SessionScreenState extends State<SessionScreen> {
       );
     }
 
+    final cfg = s.config;
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 0,
@@ -183,18 +230,26 @@ class _SessionScreenState extends State<SessionScreen> {
         ),
         crumb('Claude', p.a300),
         sep(),
-        crumb(widget.conn.model, p.text,
+        crumb(_optName(cfg?.models, cfg?.currentModel, 'model'), p.text,
             dotted: true, onTap: () => _pickModel()),
         sep(),
-        crumb(widget.conn.thinking, p.n300,
+        crumb(_optName(cfg?.thoughtLevels, cfg?.currentThought, 'thinking'), p.n300,
             dotted: true, onTap: () => _pickThinking()),
         sep(),
-        crumb(widget.conn.permMode, p.n400,
+        crumb(_optName(cfg?.modes, cfg?.currentMode, 'mode'), p.n400,
             dotted: true, onTap: () => _pickPerm()),
         sep(),
         crumb(usage, p.n400),
       ],
     );
+  }
+
+  // Resolve a current option id to its human label from the backend list; fall
+  // back to the raw id, then to a placeholder if the host hasn't reported yet.
+  String _optName(List<ConfigOptionDto>? opts, String? current, String placeholder) {
+    if (current == null || current.isEmpty) return placeholder;
+    final o = opts?.where((o) => o.id == current).firstOrNull;
+    return o?.name ?? current;
   }
 
   String _usage(SessionData s) {
@@ -224,108 +279,132 @@ class _SessionScreenState extends State<SessionScreen> {
   // ── Rows ─────────────────────────────────────────────────────────────────
   List<Widget> _buildRows(Palette p, SessionData s) {
     final rows = <Widget>[];
-    // group updates by turn (contiguous). The sidecar's raw `turn` is not a
-    // stable counter — it resets to 1 whenever the session entry is recreated
-    // (e.g. a daemon restart), so we render a 1-based *sequential* index over
-    // the contiguous groups instead of the raw value.
-    final turns = <List<UpdateDto>>[];
+    // Segment the stream by author: a contiguous run of user messages is a "ME"
+    // block, everything the agent produces (messages, thoughts, tools, plans,
+    // usage) is a "CLAUDE" block. The author separator is the only thing that
+    // distinguishes them — the message text itself is styled identically.
+    bool isMe(UpdateDto u) => u.payload is PayloadDto_UserMessage;
+    final segments = <({bool me, List<UpdateDto> items})>[];
     for (final u in s.updates) {
-      if (turns.isEmpty || turns.last.first.turn != u.turn) {
-        turns.add([u]);
+      if (segments.isEmpty || segments.last.me != isMe(u)) {
+        segments.add((me: isMe(u), items: [u]));
       } else {
-        turns.last.add(u);
+        segments.last.items.add(u);
       }
     }
     final running = s.running;
 
-    for (var ti = 0; ti < turns.length; ti++) {
-      final turn = turns[ti];
-      final live = running && ti == turns.length - 1;
-      rows.add(_turnDivider(p, ti + 1, live));
-
-      // merge tool_call_update into tool_call by id, keep order
-      final nodes = <_N>[];
-      final byId = <String, _N>{};
-      for (final u in turn) {
-        final pl = u.payload;
-        if (pl is PayloadDto_ToolCall) {
-          final n = _N.tool(pl.id, pl.kind, pl.title, pl.command, pl.status, pl.content);
-          n.desc = _firstText(pl.content);
-          byId[pl.id] = n;
-          nodes.add(n);
-        } else if (pl is PayloadDto_ToolCallUpdate) {
-          final e = byId[pl.id];
-          if (e != null) {
-            final done = pl.status == 'done' || pl.status == 'failed';
-            if (pl.content.isNotEmpty) {
-              // Before completion, content carries the human description of what
-              // the tool is doing ("List contents of working directory"); on
-              // completion it carries the output. Keep the last description so a
-              // command row can show it, and let output land in `content`.
-              if (!done) {
-                final t = _firstText(pl.content);
-                if (t != null && t.isNotEmpty) e.desc = t;
-              }
-              e.content = pl.content;
-            }
-            e.status = pl.status;
-          } else {
-            nodes.add(_N.tool(pl.id, 'other', 'tool update', null, pl.status, pl.content));
-          }
-        } else {
-          nodes.add(_N.payload(pl, u.seq));
-        }
-      }
-
-      // collapse runs of thought/tool into a fold group
-      List<_N>? group;
-      var gi = 0;
-      void flush() {
-        if (group == null) return;
-        gi += 1;
-        final key = 'g:$ti:$gi';
-        final open = _foldOpen(key, live);
-        rows.add(_foldSummary(p, key, group!, open));
-        if (open) {
-          for (var ni = 0; ni < group!.length; ni++) {
-            rows.addAll(_emitNode(p, group![ni], '$key:$ni'));
+    for (var si = 0; si < segments.length; si++) {
+      final seg = segments[si];
+      if (seg.me) {
+        final phone = seg.items.any((u) => widget.conn.isPhoneEcho(u.seq));
+        rows.add(_authorDivider(p, me: true, phone: phone));
+        for (final u in seg.items) {
+          if (u.payload case PayloadDto_UserMessage(:final text)) {
+            rows.add(_userRow(p, text));
           }
         }
-        group = null;
+      } else {
+        final live = running && si == segments.length - 1;
+        rows.add(_authorDivider(p, me: false, live: live));
+        rows.addAll(_claudeBlock(p, seg.items, si, live));
       }
-
-      for (final n in nodes) {
-        if (n.isThought || n.isTool) {
-          (group ??= <_N>[]).add(n);
-          continue;
-        }
-        flush();
-        rows.add(_payloadRow(p, n));
-      }
-      flush();
     }
     return rows;
   }
 
-  Widget _turnDivider(Palette p, int index, bool live) {
-    final color = live ? p.a300 : p.n600;
+  // Render one agent block: merge tool_call_update into tool_call by id, then
+  // collapse contiguous thought/tool runs into a fold group.
+  List<Widget> _claudeBlock(Palette p, List<UpdateDto> items, int si, bool live) {
+    final rows = <Widget>[];
+    final nodes = <_N>[];
+    final byId = <String, _N>{};
+    for (final u in items) {
+      final pl = u.payload;
+      if (pl is PayloadDto_ToolCall) {
+        final n = _N.tool(pl.id, pl.kind, pl.title, pl.command, pl.status, pl.content);
+        n.desc = _firstText(pl.content);
+        byId[pl.id] = n;
+        nodes.add(n);
+      } else if (pl is PayloadDto_ToolCallUpdate) {
+        final e = byId[pl.id];
+        if (e != null) {
+          final done = pl.status == 'done' || pl.status == 'failed';
+          if (pl.content.isNotEmpty) {
+            // Before completion, content carries the human description of what
+            // the tool is doing ("List contents of working directory"); on
+            // completion it carries the output. Keep the last description so a
+            // command row can show it, and let output land in `content`.
+            if (!done) {
+              final t = _firstText(pl.content);
+              if (t != null && t.isNotEmpty) e.desc = t;
+            }
+            e.content = pl.content;
+          }
+          e.status = pl.status;
+        } else {
+          nodes.add(_N.tool(pl.id, 'other', 'tool update', null, pl.status, pl.content));
+        }
+      } else {
+        nodes.add(_N.payload(pl, u.seq));
+      }
+    }
+
+    List<_N>? group;
+    var gi = 0;
+    void flush() {
+      if (group == null) return;
+      gi += 1;
+      final key = 'g:$si:$gi';
+      final open = _foldOpen(key, live);
+      rows.add(_foldSummary(p, key, group!, open));
+      if (open) {
+        for (var ni = 0; ni < group!.length; ni++) {
+          rows.addAll(_emitNode(p, group![ni], '$key:$ni', live));
+        }
+      }
+      group = null;
+    }
+
+    for (final n in nodes) {
+      if (n.isThought || n.isTool) {
+        (group ??= <_N>[]).add(n);
+        continue;
+      }
+      flush();
+      rows.add(_payloadRow(p, n));
+    }
+    flush();
+    return rows;
+  }
+
+  Widget _authorDivider(Palette p, {required bool me, bool live = false, bool phone = false}) {
+    // Speaker headers, straight from the mockup: ME in the negative (coral)
+    // tone, CLAUDE in the positive (green) tone, each over its faint tinted rule.
+    final label = me ? 'ME' : 'CLAUDE';
+    final color = me ? p.neg : p.pos;
+    final lineColor = me ? p.negBg : p.posBg;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 6, 15, 8),
+      padding: const EdgeInsets.fromLTRB(15, 12, 15, 8),
       child: Row(
         children: [
-          Text('TURN $index', style: mono(10, weight: FontWeight.w500, color: color, spacing: 1.1)),
+          Text(label, style: mono(10, weight: FontWeight.w600, color: color, spacing: 1.4)),
           const SizedBox(width: 9),
           Expanded(
             child: Container(
               height: 1,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: [live ? p.a700 : p.divider, Colors.transparent]),
+                gradient: LinearGradient(colors: [lineColor, Colors.transparent]),
               ),
             ),
           ),
           const SizedBox(width: 9),
-          Text(live ? 'now' : '', style: mono(10, weight: FontWeight.w500, color: color, spacing: 1.1)),
+          if (me && phone) ...[
+            Icon(Icons.smartphone, size: 11, color: p.n500),
+            const SizedBox(width: 4),
+            Text('this phone', style: mono(9.5, color: p.n600, spacing: 0.3)),
+          ] else if (live)
+            Text('now', style: mono(10, weight: FontWeight.w500, color: color, spacing: 1.1)),
         ],
       ),
     );
@@ -376,11 +455,13 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  List<Widget> _emitNode(Palette p, _N n, String key) {
+  List<Widget> _emitNode(Palette p, _N n, String key, bool live) {
     final out = <Widget>[];
     if (n.isThought) {
       final tk = 'th:$key';
-      final open = _foldOpen(tk, false);
+      // Expanded while the turn runs — you watch Claude think in real time — then
+      // it folds itself away once the turn is done.
+      final open = _foldOpen(tk, live);
       out.add(_nodeLine(
         p,
         key: tk,
@@ -596,7 +677,7 @@ class _SessionScreenState extends State<SessionScreen> {
     final pl = n.payload!;
     switch (pl) {
       case PayloadDto_UserMessage(:final text):
-        return _userRow(p, text, phone: widget.conn.isPhoneEcho(n.seq));
+        return _userRow(p, text);
       case PayloadDto_AgentMessage(:final text):
         return Padding(
           padding: const EdgeInsets.fromLTRB(15, 6, 15, 14),
@@ -626,34 +707,25 @@ class _SessionScreenState extends State<SessionScreen> {
     }
   }
 
-  Widget _userRow(Palette p, String text, {bool phone = false}) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(15, 0, 15, 10),
-      padding: const EdgeInsets.only(left: 11),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: p.a700, width: 2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          MdText(text, base: ui(13.5, color: p.n200, height: 1.5)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(phone ? Icons.smartphone : Icons.terminal, size: 12, color: p.n500),
-              if (phone) ...[
-                const SizedBox(width: 5),
-                Text('sent from this phone',
-                    style: mono(9.5, color: p.n600, spacing: 0.3)),
-              ],
-            ],
-          ),
-        ],
-      ),
+  // Styled identically to an agent message — the author is conveyed by the "ME"
+  // separator above, not by the message body.
+  Widget _userRow(Palette p, String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 14),
+      child: MdText(text, base: ui(14.5, color: p.text, height: 1.6)),
     );
   }
 
-  Widget _planCard(Palette p, List<String> entries) {
+  Widget _planCard(Palette p, List<PlanEntryDto> entries) {
+    // Status is authoritative now (from agent-shell), not guessed by position:
+    // completed rows strike through, the in-progress row is accented, pending
+    // rows stay bright and unchecked.
+    ({IconData icon, Color mark, Color text, bool strike}) style(String s) => switch (s) {
+          'completed' => (icon: Icons.check_circle, mark: p.pos, text: p.n500, strike: true),
+          'in_progress' =>
+            (icon: Icons.radio_button_checked, mark: p.a300, text: p.text, strike: false),
+          _ => (icon: Icons.circle_outlined, mark: p.n600, text: p.n200, strike: false),
+        };
     return Container(
       margin: const EdgeInsets.fromLTRB(15, 0, 15, 12),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
@@ -673,28 +745,30 @@ class _SessionScreenState extends State<SessionScreen> {
             ],
           ),
           const SizedBox(height: 7),
-          for (var i = 0; i < entries.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(i < 2 ? Icons.check_circle : Icons.circle_outlined,
-                        size: 13, color: i < 2 ? p.pos : p.n600),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(entries[i],
-                        style: ui(12.5,
-                            color: i < 2 ? p.n500 : p.n200,
-                            height: 1.5,
-                            decoration: i < 2 ? TextDecoration.lineThrough : null)),
-                  ),
-                ],
-              ),
-            ),
+          for (final e in entries)
+            Builder(builder: (_) {
+              final st = style(e.status);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(st.icon, size: 13, color: st.mark),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(e.content,
+                          style: ui(12.5,
+                              color: st.text,
+                              height: 1.5,
+                              decoration: st.strike ? TextDecoration.lineThrough : null)),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );
@@ -774,7 +848,7 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget _composer(Palette p, SessionData s) {
     final running = s.running;
     return Container(
-      padding: const EdgeInsets.fromLTRB(13, 8, 13, 10),
+      padding: const EdgeInsets.fromLTRB(9, 8, 9, 10),
       decoration: BoxDecoration(
         color: p.band,
         border: Border(top: BorderSide(color: p.divider)),
@@ -783,17 +857,24 @@ class _SessionScreenState extends State<SessionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (running) ...[
-            Row(
-              children: [
-                Icon(Icons.hourglass_bottom, size: 12, color: p.n500),
-                const SizedBox(width: 7),
-                Text('AGENT IS MID-TURN · THE SIDECAR MAY REFUSE',
-                    style: mono(10, weight: FontWeight.w500, color: p.n500, spacing: 0.7)),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.hourglass_bottom, size: 12, color: p.n500),
+                  const SizedBox(width: 7),
+                  Text('AGENT IS WORKING · STOP IT TO SEND',
+                      style: mono(10, weight: FontWeight.w500, color: p.n500, spacing: 0.7)),
+                ],
+              ),
             ),
             const SizedBox(height: 7),
           ],
-          if (_slash) _slashMenu(p),
+          if (_slash)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _slashMenu(p),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -801,27 +882,31 @@ class _SessionScreenState extends State<SessionScreen> {
                 icon: Icons.attach_file,
                 size: 19,
                 color: p.n400,
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Attachments aren’t wired yet.')),
-                ),
+                onTap: () => _showAttachMenu(p),
               ),
-              const SizedBox(width: 7),
+              const SizedBox(width: 3),
               Expanded(
-                child: TextField(
+                child: ExtendedTextField(
                   controller: _input,
+                  // Inserted attachment paths render as atomic pill-chips; the
+                  // default strut is wrong for WidgetSpans, so clear it.
+                  specialTextSpanBuilder: _AttachSpanBuilder(onChipTap: _showPathToast),
+                  strutStyle: const StrutStyle(),
                   style: ui(13.5, color: p.text),
                   cursorColor: p.accent,
                   minLines: 1,
                   maxLines: 5,
                   onChanged: (v) {
+                    // Rebuild on every keystroke while a slash is being typed so
+                    // the command menu re-filters against the current prefix.
                     final on = v.startsWith('/');
-                    if (on != _slash) setState(() => _slash = on);
+                    if (on || on != _slash) setState(() => _slash = on);
                   },
                   onSubmitted: (_) => _send(s),
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: running
-                        ? 'Send anyway — it may be refused'
+                        ? 'Agent is working — stop it to send'
                         : 'Message the agent or /command…',
                     hintStyle: ui(13.5, color: p.n600),
                     filled: true,
@@ -838,16 +923,21 @@ class _SessionScreenState extends State<SessionScreen> {
                 ),
               ),
               const SizedBox(width: 7),
-              _SendButton(color: p.accent, onTap: () => _send(s)),
-              if (running) ...[
-                const SizedBox(width: 7),
-                NIconButton(
-                  icon: Icons.stop_circle_outlined,
-                  size: 20,
+              // We know the turn state, so mid-turn the send button *becomes* the
+              // interrupt button — you can't send anyway (it'd only be refused),
+              // but you can forcefully stop the agent from the same spot.
+              if (running)
+                _SendButton(
                   color: p.neg,
+                  icon: Icons.stop,
                   onTap: () => widget.conn.interrupt(widget.sessionId),
+                )
+              else
+                _SendButton(
+                  color: p.accent,
+                  icon: Icons.arrow_upward,
+                  onTap: () => _send(s),
                 ),
-              ],
             ],
           ),
         ],
@@ -855,13 +945,17 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
+  // The command list is the host's, fetched once as Config and matched from
+  // memory against the prefix being typed (`/comp` → `/compact`). Empty when the
+  // host advertised none or nothing matches — then the menu simply doesn't show.
   Widget _slashMenu(Palette p) {
-    const items = [
-      ('/compact', 'summarise the conversation so far'),
-      ('/clear', 'start a fresh context'),
-      ('/model', 'switch the model'),
-      ('/plan', 'ask for a plan before acting'),
+    String display(CommandInfoDto c) => c.name.startsWith('/') ? c.name : '/${c.name}';
+    final q = _input.text.split(RegExp(r'\s')).first.toLowerCase();
+    final matches = [
+      for (final c in _s.config?.commands ?? const <CommandInfoDto>[])
+        if (display(c).toLowerCase().startsWith(q)) c,
     ];
+    if (matches.isEmpty) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
       decoration: BoxDecoration(
@@ -870,12 +964,14 @@ class _SessionScreenState extends State<SessionScreen> {
         border: Border.all(color: p.n800),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final it in items)
+          for (final c in matches)
             GestureDetector(
               onTap: () {
-                _input.text = '${it.$1} ';
+                _input.text = '${display(c)} ';
                 _input.selection = TextSelection.collapsed(offset: _input.text.length);
+                setState(() {});
               },
               behavior: HitTestBehavior.opaque,
               child: Container(
@@ -886,10 +982,10 @@ class _SessionScreenState extends State<SessionScreen> {
                 ),
                 child: Row(
                   children: [
-                    Text(it.$1, style: mono(11.5, weight: FontWeight.w500, color: p.a300)),
+                    Text(display(c), style: mono(11.5, weight: FontWeight.w500, color: p.a300)),
                     const SizedBox(width: 9),
                     Expanded(
-                      child: Text(it.$2,
+                      child: Text(c.description ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: ui(11, color: p.n500)),
@@ -904,59 +1000,189 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   Future<void> _send(SessionData s) async {
-    final text = _input.text.trim();
+    if (s.running) return; // send is blocked mid-turn — stop the agent first
+    final text = _expandAttachments(_input.text).trim();
     if (text.isEmpty) return;
     _input.clear();
     setState(() => _slash = false);
     await widget.conn.send(widget.sessionId, text);
   }
 
+  // ── Attachments (item 7) ─────────────────────────────────────────────────
+  // Three sources, all resolving to a HOST path we drop into the composer as an
+  // `@path` token: browse the host FS directly, or upload a gallery photo / a
+  // phone file (base64 over the wire → landed on the host → path returned).
+  void _showAttachMenu(Palette p) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: p.band,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _attachTile(p, Icons.folder_open, 'Host file', 'Browse this machine’s files',
+                () { Navigator.pop(ctx); _attachHostFile(); }),
+            _attachTile(p, Icons.image_outlined, 'Photo', 'Upload from your gallery',
+                () { Navigator.pop(ctx); _attachGallery(); }),
+            _attachTile(p, Icons.upload_file, 'File', 'Upload a file from this phone',
+                () { Navigator.pop(ctx); _attachPhoneFile(); }),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _attachTile(Palette p, IconData icon, String title, String sub, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: p.a300, size: 22),
+      title: Text(title, style: ui(14, weight: FontWeight.w600, color: p.text)),
+      subtitle: Text(sub, style: ui(11.5, color: p.n500)),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _attachHostFile() async {
+    final path = await showHostBrowser(context, widget.conn);
+    if (path != null) _insertAttachment(path);
+  }
+
+  Future<void> _attachGallery() async {
+    final x = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (x == null) return;
+    if (!mounted) return;
+    await _uploadPathAndInsert(x.name, x.path);
+  }
+
+  Future<void> _attachPhoneFile() async {
+    // withData:false → we get a filesystem path and stream it off disk, rather
+    // than loading the whole file into memory.
+    final res = await FilePicker.platform.pickFiles();
+    if (res == null || res.files.isEmpty) return;
+    final f = res.files.first;
+    final path = f.path;
+    if (!mounted) return;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t read that file.')),
+      );
+      return;
+    }
+    await _uploadPathAndInsert(f.name, path);
+  }
+
+  Future<void> _uploadPathAndInsert(String name, String srcPath) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final progress = ValueNotifier<double>(0);
+    final sw = Stopwatch()..start();
+    messenger.showSnackBar(SnackBar(
+      duration: const Duration(minutes: 30),
+      content: ValueListenableBuilder<double>(
+        valueListenable: progress,
+        builder: (_, v, _) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Uploading $name… ${(v * 100).toStringAsFixed(0)}%'),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(value: v <= 0 ? null : v),
+            ),
+          ],
+        ),
+      ),
+    ));
+    try {
+      var total = 0;
+      final path = await widget.conn.uploadFile(name, srcPath,
+          onProgress: (sent, t) {
+        total = t;
+        if (t > 0) progress.value = sent / t;
+      });
+      sw.stop();
+      messenger.hideCurrentSnackBar();
+      _insertAttachment(path);
+      final secs = sw.elapsedMilliseconds / 1000.0;
+      final mb = total / (1024 * 1024);
+      final rate = secs > 0 ? mb / secs : 0;
+      messenger.showSnackBar(SnackBar(
+        content: Text('Uploaded $name — ${mb.toStringAsFixed(0)} MB in '
+            '${secs.toStringAsFixed(1)}s (${rate.toStringAsFixed(1)} MB/s)'),
+        duration: const Duration(seconds: 5),
+      ));
+    } catch (e) {
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+    } finally {
+      progress.dispose();
+    }
+  }
+
+  /// Drop an attachment path into the composer at the cursor as an atomic
+  /// pill-chip (delimited by control flags that _AttachSpanBuilder renders as a
+  /// chip and _send expands to `@path`).
+  void _insertAttachment(String path) {
+    final token = '$_attachFlag$path$_attachFlag ';
+    final text = _input.text;
+    final sel = _input.selection;
+    final start = sel.start >= 0 ? sel.start : text.length;
+    final end = sel.end >= 0 ? sel.end : text.length;
+    final next = text.replaceRange(start, end, token);
+    _input.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + token.length),
+    );
+    setState(() {});
+  }
+
+  void _showPathToast(String path) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(path), duration: const Duration(seconds: 2)),
+    );
+  }
+
   // ── Pickers ────────────────────────────────────────────────────────────────
-  Future<void> _pickModel() async {
+  // All three are backend-driven: options and the current selection come from
+  // the session's Config; picking sends the matching slash command and the host
+  // echoes a new Config back. When the host hasn't reported a list yet, there's
+  // nothing to choose — say so instead of offering stale hardcoded values.
+  Future<void> _pickOption(
+    String title,
+    String command,
+    List<ConfigOptionDto>? opts,
+    String? current,
+    void Function(String id) apply,
+  ) async {
+    if (opts == null || opts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$title isn’t available — the host hasn’t reported it yet.')),
+      );
+      return;
+    }
     final v = await showNPicker<String>(
       context: context,
-      title: 'Model',
-      command: '/model',
-      current: widget.conn.model,
-      footnote: 'sent as WireMsg::Command · session ${widget.sessionId.substring(0, 8)}',
-      options: const [
-        ('Opus', 'Opus', 'deepest reasoning, slowest'),
-        ('Sonnet', 'Sonnet', 'the everyday balance'),
-        ('Haiku', 'Haiku', 'fast and cheap for small edits'),
-      ],
+      title: title,
+      command: command,
+      current: current ?? '',
+      footnote: 'sent as $command · session ${widget.sessionId.substring(0, 8)}',
+      options: [for (final o in opts) (o.id, o.name, o.description ?? '')],
     );
-    if (v != null) widget.conn.setModel(v);
+    if (v != null && v != current) apply(v);
   }
 
-  Future<void> _pickThinking() async {
-    final v = await showNPicker<String>(
-      context: context,
-      title: 'Thinking level',
-      command: '/thinking',
-      current: widget.conn.thinking,
-      options: const [
-        ('off', 'off', 'answer directly, no visible reasoning'),
-        ('think', 'think', 'a short pass before acting'),
-        ('think hard', 'think hard', 'longer budget on tricky work'),
-      ],
-    );
-    if (v != null) widget.conn.setThinking(v);
-  }
+  Future<void> _pickModel() => _pickOption('Model', '/model', _s.config?.models,
+      _s.config?.currentModel, (id) => widget.conn.setModel(widget.sessionId, id));
 
-  Future<void> _pickPerm() async {
-    final v = await showNPicker<String>(
-      context: context,
-      title: 'Permission mode',
-      command: '/permissions',
-      current: widget.conn.permMode,
-      options: const [
-        ('Default', 'Default', 'ask before anything that writes or runs'),
-        ('Accept edits', 'Accept edits', 'file edits go through, commands still ask'),
-        ('Bypass', 'Bypass', 'never ask — everything is allowed'),
-      ],
-    );
-    if (v != null) widget.conn.setPermMode(v);
-  }
+  Future<void> _pickThinking() => _pickOption('Thinking level', '/thought',
+      _s.config?.thoughtLevels, _s.config?.currentThought,
+      (id) => widget.conn.setThinking(widget.sessionId, id));
+
+  Future<void> _pickPerm() => _pickOption('Permission mode', '/mode', _s.config?.modes,
+      _s.config?.currentMode, (id) => widget.conn.setPermMode(widget.sessionId, id));
 }
 
 /// A merged stream node: either a raw payload, or a tool_call with its updates
@@ -1023,8 +1249,9 @@ class _StatusMark extends StatelessWidget {
 
 class _SendButton extends StatelessWidget {
   final Color color;
-  final VoidCallback onTap;
-  const _SendButton({required this.color, required this.onTap});
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _SendButton({required this.color, required this.onTap, this.icon = Icons.arrow_upward});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1036,7 +1263,7 @@ class _SendButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: color),
         ),
-        child: Icon(Icons.arrow_upward, size: 19, color: color),
+        child: Icon(icon, size: 19, color: color),
       ),
     );
   }
@@ -1073,6 +1300,227 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
       opacity: Tween(begin: 1.0, end: 0.28)
           .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
       child: dot,
+    );
+  }
+}
+
+/// A modal file browser over the HOST filesystem. Directories navigate in place;
+/// tapping a file pops the sheet with its absolute path. Returns null on cancel.
+Future<String?> showHostBrowser(BuildContext context, HostConn conn) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _HostBrowser(conn: conn),
+  );
+}
+
+class _HostBrowser extends StatefulWidget {
+  final HostConn conn;
+  const _HostBrowser({required this.conn});
+  @override
+  State<_HostBrowser> createState() => _HostBrowserState();
+}
+
+class _HostBrowserState extends State<_HostBrowser> {
+  HostListing? _listing;
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(null);
+  }
+
+  Future<void> _load(String? path) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final l = await widget.conn.browseHost(path);
+      if (!mounted) return;
+      setState(() {
+        _listing = l;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.p;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (ctx, scroll) => Container(
+        decoration: BoxDecoration(
+          color: p.band,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.dns_outlined, size: 16, color: p.n500),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _listing?.dir ?? 'Host files',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(11.5, weight: FontWeight.w600, color: p.text),
+                    ),
+                  ),
+                  NIconButton(
+                    icon: Icons.close,
+                    size: 20,
+                    color: p.n400,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: p.divider),
+            Expanded(child: _body(p, scroll)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body(Palette p, ScrollController scroll) {
+    if (_loading) {
+      return const Center(
+        child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Couldn’t browse: $_error',
+              textAlign: TextAlign.center, style: ui(12.5, color: p.neg)),
+        ),
+      );
+    }
+    final l = _listing!;
+    final rows = <Widget>[
+      if (l.parent != null) _row(p, Icons.arrow_upward, '..', () => _load(l.parent)),
+      for (final e in l.entries)
+        _row(
+          p,
+          e.isDir ? Icons.folder : Icons.insert_drive_file_outlined,
+          e.name,
+          () => e.isDir ? _load(e.path) : Navigator.pop(context, e.path),
+          dir: e.isDir,
+        ),
+    ];
+    if (rows.isEmpty) {
+      return Center(child: Text('Empty directory', style: ui(12.5, color: p.n500)));
+    }
+    return ListView(controller: scroll, children: rows);
+  }
+
+  Widget _row(Palette p, IconData icon, String name, VoidCallback onTap, {bool dir = false}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 46),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: dir ? p.a300 : p.n400),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(name,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: ui(13, color: p.text)),
+            ),
+            if (dir) Icon(Icons.chevron_right, size: 18, color: p.n600),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Turns each `path` run in the composer's raw text into an atomic
+/// pill-chip. `deleteAll` (ExtendedWidgetSpan default) makes one backspace
+/// remove the whole token, and the caret can't land inside it.
+class _AttachSpanBuilder extends SpecialTextSpanBuilder {
+  final void Function(String path)? onChipTap;
+  _AttachSpanBuilder({this.onChipTap});
+
+  @override
+  SpecialText? createSpecialText(String flag,
+      {TextStyle? textStyle, SpecialTextGestureTapCallback? onTap, required int index}) {
+    if (flag.isEmpty) return null;
+    if (isStart(flag, _attachFlag)) {
+      return _AttachText(textStyle,
+          start: index - (_attachFlag.length - 1), onChipTap: onChipTap);
+    }
+    return null;
+  }
+}
+
+class _AttachText extends SpecialText {
+  final int start;
+  final void Function(String path)? onChipTap;
+  _AttachText(TextStyle? style, {required this.start, this.onChipTap})
+      : super(_attachFlag, _attachFlag, style);
+
+  @override
+  InlineSpan finishText() {
+    final path = getContent();
+    return ExtendedWidgetSpan(
+      actualText: toString(),
+      start: start,
+      alignment: PlaceholderAlignment.middle,
+      child: _AttachChip(path: path, onTap: () => onChipTap?.call(path)),
+    );
+  }
+}
+
+class _AttachChip extends StatelessWidget {
+  final String path;
+  final VoidCallback? onTap;
+  const _AttachChip({required this.path, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.p;
+    final parts = path.split('/').where((s) => s.isNotEmpty);
+    final name = parts.isEmpty ? path : parts.last;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: p.a900,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: p.a700),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.attach_file, size: 12, color: p.a300),
+            const SizedBox(width: 3),
+            Text(name, style: mono(11.5, weight: FontWeight.w500, color: p.a300)),
+          ],
+        ),
+      ),
     );
   }
 }

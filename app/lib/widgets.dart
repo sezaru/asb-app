@@ -56,7 +56,15 @@ class NButton extends StatelessWidget {
           SizedBox(width: gap),
         ],
         if (label != null)
-          Text(label!, style: ui(fontSize, weight: FontWeight.w500, color: fg)),
+          Flexible(
+            child: Text(
+              label!,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: ui(fontSize, weight: FontWeight.w500, color: fg),
+            ),
+          ),
       ],
     );
 

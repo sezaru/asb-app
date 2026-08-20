@@ -1,9 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:asb_client/asb_client.dart';
 import 'package:flutter/foundation.dart';
 
 enum ConnStatus { connecting, connected, down }
+
+/// A resolved host directory: the entries plus where they live, so the browser
+/// can show the path and a parent (".." ) affordance.
+class HostListing {
+  final String dir;
+  final String? parent;
+  final List<FsEntryDto> entries;
+  HostListing(this.dir, this.parent, this.entries);
+}
 
 // Wire-level tracing for the multi-client fidelity tests. kDebugMode is a const
 // `false` in release builds, so these calls tree-shake out entirely there.
@@ -21,6 +31,10 @@ class SessionData {
   // reconnect replays backlog that overlaps what we already have.
   final Set<BigInt> seenSeqs = {};
   PermissionReqDto? pending;
+  // Backend-authoritative knobs (models/modes/thought + slash commands). Null
+  // until the host sends its first Config for this session; the header pickers
+  // and the composer's command autocomplete read straight off it.
+  SessionConfigDto? config;
   SessionData({required this.title, this.running = false, BigInt? lastSeq})
       : lastSeq = lastSeq ?? BigInt.zero;
 }
@@ -36,6 +50,10 @@ class HostConn extends ChangeNotifier {
   ConnStatus status = ConnStatus.connecting;
   final Map<String, SessionData> sessions = {};
   String? catchup;
+  // `connected` flips as soon as `hello` returns, but the first session snapshot
+  // arrives a beat later over the event stream. Until it does, we don't yet know
+  // whether the host is empty — the UI shows a loading state, not "nothing here".
+  bool sessionsLoaded = false;
 
   // Auto-reconnect: a phone network is expected to drop, so we never sit in a
   // dead state — we retry with backoff and resync via per-session high-water so
@@ -45,10 +63,6 @@ class HostConn extends ChangeNotifier {
   Duration _backoff = const Duration(seconds: 1);
   static const _maxBackoff = Duration(seconds: 15);
 
-  // Per-connection agent knobs (UI state; sent as slash commands on change).
-  String model = 'Opus';
-  String thinking = 'think';
-  String permMode = 'Default';
 
   /// The sidecar authoritatively broadcasts every injected prompt back as a
   /// `user_message` (so all clients render it, correctly turn-grouped). We don't
@@ -56,6 +70,13 @@ class HostConn extends ChangeNotifier {
   /// hasn't seen echoed yet, and badge the matching echo "sent from this phone".
   final List<String> _pendingSent = [];
   final Set<BigInt> phoneEchoSeqs = {};
+
+  // Host FS browse / upload are request/reply over the same event stream: each
+  // request carries a monotonic `req` id and its reply (FsEntries/UploadDone/
+  // FsError) completes the matching waiter. No global state, so concurrent
+  // browses never cross.
+  BigInt _nextReq = BigInt.zero;
+  final Map<BigInt, Completer<HostEventDto>> _fsWaiters = {};
 
   bool isPhoneEcho(BigInt seq) => phoneEchoSeqs.contains(seq);
 
@@ -80,6 +101,7 @@ class HostConn extends ChangeNotifier {
     if (_disposed) return;
     _retry?.cancel();
     status = ConnStatus.connecting;
+    sessionsLoaded = false;
     notifyListeners();
     try {
       final s = await client.connect(hostNodeIdHex: hostId);
@@ -126,6 +148,7 @@ class HostConn extends ChangeNotifier {
     switch (e) {
       case HostEventDto_Sessions(:final field0):
         _trace('ASBRECV sessions ${[for (final m in field0) "${m.id}:last=${m.lastSeq}:run=${m.running}"]}');
+        sessionsLoaded = true;
         for (final m in field0) {
           final s = _bucket(m.id, m.title);
           s.title = m.title;
@@ -154,6 +177,15 @@ class HostConn extends ChangeNotifier {
         _trace('ASBRECV perm-resolved sess=$session id=$id');
         final b = _bucket(session);
         if (b.pending?.id == id) b.pending = null;
+      case HostEventDto_Config(:final session, :final config):
+        _trace('ASBRECV config sess=$session models=${config.models.length} cmds=${config.commands.length}');
+        _bucket(session).config = config;
+      case HostEventDto_FsEntries(:final req):
+        _fsWaiters.remove(req)?.complete(e);
+      case HostEventDto_UploadDone(:final req):
+        _fsWaiters.remove(req)?.complete(e);
+      case HostEventDto_FsError(:final req):
+        _fsWaiters.remove(req)?.complete(e);
       case HostEventDto_Disconnected():
         _trace('ASBRECV disconnected');
         status = ConnStatus.down;
@@ -178,15 +210,83 @@ class HostConn extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setModel(String v) => _setKnob(() => model = v, '/model $v');
-  void setThinking(String v) => _setKnob(() => thinking = v, '/thinking $v');
-  void setPermMode(String v) => _setKnob(() => permMode = v, '/permissions $v');
+  // The knobs are backend-owned: we send the change as a slash command and let
+  // the host echo the new Config back, rather than mutating local state
+  // optimistically. Names match the bridge's command table (/model /mode
+  // /thought); the arg is the option *id*, not its display name.
+  void setModel(String sessionId, String id) => command(sessionId, '/model', id);
+  void setThinking(String sessionId, String id) => command(sessionId, '/thought', id);
+  void setPermMode(String sessionId, String id) => command(sessionId, '/mode', id);
 
-  void _setKnob(VoidCallback apply, String _) {
-    apply();
-    notifyListeners();
-    // The knob is a UI convenience; a live sidecar would carry the matching
-    // slash command. Left unsent here until the protocol models it.
+  Future<void> command(String sessionId, String name, [String? arg]) async {
+    _trace('ASBCMD sess=$sessionId name=$name arg=$arg');
+    await _session?.command(session: sessionId, name: name, arg: arg);
+  }
+
+  /// Browse a directory on the HOST machine (the sidecar's own FS). `path` null
+  /// starts at the host user's home. Throws on a host-side error or timeout.
+  Future<HostListing> browseHost(String? path) async {
+    final sess = _session;
+    if (sess == null) throw StateError('not connected');
+    final req = (_nextReq += BigInt.one);
+    final c = Completer<HostEventDto>();
+    _fsWaiters[req] = c;
+    try {
+      await sess.fsList(req: req, path: path);
+      final ev = await c.future.timeout(const Duration(seconds: 20));
+      return switch (ev) {
+        HostEventDto_FsEntries(:final dir, :final parent, :final entries) =>
+          HostListing(dir, parent, entries),
+        HostEventDto_FsError(:final message) => throw Exception(message),
+        _ => throw Exception('unexpected reply'),
+      };
+    } finally {
+      _fsWaiters.remove(req);
+    }
+  }
+
+  // Raw bytes on the wire (no base64), so a 4MiB slice is a ~4MiB frame, well
+  // under the 8MB cap. Bigger chunks = far fewer per-chunk wire round-trips (4×
+  // fewer than 1MiB), and the phone still holds only one slice.
+  static const int _uploadChunk = 4 << 20;
+
+  /// Upload the file at `srcPath` to the host as `name`, streaming it in bounded
+  /// raw-byte chunks off disk, and return the absolute path where it landed.
+  /// Peak memory is ~one chunk regardless of file size.
+  /// `onProgress` fires after each chunk with (bytesSent, totalBytes).
+  Future<String> uploadFile(String name, String srcPath,
+      {void Function(int sent, int total)? onProgress}) async {
+    final sess = _session;
+    if (sess == null) throw StateError('not connected');
+    final req = (_nextReq += BigInt.one);
+    final c = Completer<HostEventDto>();
+    _fsWaiters[req] = c;
+    final raf = await File(srcPath).open();
+    try {
+      await sess.uploadStart(req: req, name: name);
+      final len = await raf.length();
+      onProgress?.call(0, len);
+      var off = 0;
+      while (off < len) {
+        final n = (len - off) < _uploadChunk ? (len - off) : _uploadChunk;
+        final bytes = await raf.read(n);
+        await sess.uploadChunk(req: req, data: bytes);
+        off += n;
+        onProgress?.call(off, len);
+        // A mid-stream host error (e.g. decode failure) short-circuits the loop.
+        if (c.isCompleted) break;
+      }
+      await sess.uploadFinish(req: req);
+      final ev = await c.future.timeout(const Duration(minutes: 5));
+      return switch (ev) {
+        HostEventDto_UploadDone(:final path) => path,
+        HostEventDto_FsError(:final message) => throw Exception(message),
+        _ => throw Exception('unexpected reply'),
+      };
+    } finally {
+      await raf.close();
+      _fsWaiters.remove(req);
+    }
   }
 
   @override

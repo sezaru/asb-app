@@ -43,6 +43,17 @@ dependencies:
   # App-private directory for the client's identity + host roster.
   path_provider: ^2.1.4
 
+  # Attachments: gallery images (image_picker) and arbitrary phone files
+  # (file_picker). Both read bytes we base64 onto the wire; the sidecar lands
+  # them on the host and hands back a path to reference in a prompt.
+  image_picker: ^1.1.2
+  file_picker: ^8.1.6
+
+  # Composer pill-chips: inserted attachment paths render as atomic inline
+  # tokens (tap → full path, one backspace deletes the whole chip), expanded to
+  # @path text on send.
+  extended_text_field: ^17.0.0
+
   # Inter (body/heading) + Roboto Mono (code) — the Nocturne design faces.
   google_fonts: ^6.2.1
 
