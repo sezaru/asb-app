@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use asb_protocol::emacs::EmacsOut;
@@ -87,6 +89,18 @@ async fn handle_phone_conn(
     )
     .await?;
 
+    // Mirror each session's backend knobs (models/modes/thought + commands) so
+    // the phone's pickers and autocomplete are populated before any turn runs.
+    for (session, config) in reg.configs() {
+        send_wire(&mut send, &WireMsg::Config { session, config }).await?;
+    }
+
+    // In-flight chunked uploads on THIS connection, keyed by request id: the
+    // open file we're appending decoded chunks to, plus its final path.
+    let mut uploads: HashMap<u64, (PathBuf, std::fs::File)> = HashMap::new();
+    // Per-req upload timing (first chunk -> finish) for throughput logging.
+    let mut up_timing: HashMap<u64, (std::time::Instant, u64)> = HashMap::new();
+
     // Replay each session's backlog, tracking a per-session high-water seq so the
     // live stream below never re-sends an update already replayed.
     let mut hw: HashMap<SessionId, Seq> = HashMap::new();
@@ -125,7 +139,88 @@ async fn handle_phone_conn(
             r = recv_frame(&mut recv) => match r {
                 Ok(body) => {
                     if let Ok(m) = ciborium::from_reader::<WireMsg, _>(&body[..]) {
-                        handle_inbound(m, &reg, &out_tx).await;
+                        // FS browse / upload touch the host filesystem and reply
+                        // to THIS phone only (not a broadcast), so they're served
+                        // inline on `send`. The blocking work runs off-reactor.
+                        match m {
+                            WireMsg::FsList { req, path } => {
+                                let reply = tokio::task::spawn_blocking(move || {
+                                    match crate::hostfs::list_dir(path.as_deref()) {
+                                        Ok((dir, parent, entries)) => {
+                                            WireMsg::FsEntries { req, dir, parent, entries }
+                                        }
+                                        Err(e) => WireMsg::FsError { req, message: format!("{e:#}") },
+                                    }
+                                })
+                                .await
+                                .unwrap_or(WireMsg::FsError { req, message: "fs task panicked".into() });
+                                send_wire(&mut send, &reply).await?;
+                            }
+                            WireMsg::UploadStart { req, name } => {
+                                match tokio::task::spawn_blocking(move || crate::hostfs::create_upload(&name))
+                                    .await
+                                    .unwrap_or_else(|_| Err(anyhow::anyhow!("upload task panicked")))
+                                {
+                                    Ok((path, file)) => { uploads.insert(req, (path, file)); }
+                                    Err(e) => {
+                                        send_wire(&mut send, &WireMsg::FsError { req, message: format!("{e:#}") }).await?;
+                                    }
+                                }
+                            }
+                            WireMsg::UploadChunk { req, data } => {
+                                {
+                                    let e = up_timing
+                                        .entry(req)
+                                        .or_insert_with(|| (std::time::Instant::now(), 0));
+                                    e.1 += data.len() as u64;
+                                }
+                                if let Some((path, file)) = uploads.remove(&req) {
+                                    let (path, file, res) = tokio::task::spawn_blocking(move || {
+                                        let mut file = file;
+                                        let res = file.write_all(&data).map_err(anyhow::Error::from);
+                                        (path, file, res)
+                                    })
+                                    .await
+                                    .expect("upload write task");
+                                    match res {
+                                        // Keep the handle for the next chunk.
+                                        Ok(()) => { uploads.insert(req, (path, file)); }
+                                        Err(e) => {
+                                            let _ = std::fs::remove_file(&path);
+                                            send_wire(&mut send, &WireMsg::FsError { req, message: format!("{e:#}") }).await?;
+                                        }
+                                    }
+                                }
+                            }
+                            WireMsg::UploadFinish { req } => {
+                                if let Some((start, bytes)) = up_timing.remove(&req) {
+                                    let el = start.elapsed().as_secs_f64().max(1e-9);
+                                    let mb = bytes as f64 / 1_048_576.0;
+                                    tracing::info!(
+                                        req,
+                                        bytes,
+                                        secs = el,
+                                        mb_s = mb / el,
+                                        mbit_s = mb * 8.0 / el,
+                                        "upload throughput"
+                                    );
+                                }
+                                let reply = match uploads.remove(&req) {
+                                    Some((path, file)) => tokio::task::spawn_blocking(move || {
+                                        let mut file = file;
+                                        match file.flush() {
+                                            Ok(()) => WireMsg::UploadDone { req, path: path.to_string_lossy().into_owned() },
+                                            Err(e) => WireMsg::FsError { req, message: format!("flush: {e}") },
+                                        }
+                                    })
+                                    .await
+                                    .unwrap_or(WireMsg::FsError { req, message: "flush task panicked".into() }),
+                                    None => WireMsg::FsError { req, message: "no upload in progress".into() },
+                                };
+                                send_wire(&mut send, &reply).await?;
+                            }
+                            other => handle_inbound(other, &reg, &out_tx).await,
+                        }
                     }
                 }
                 Err(e) => {
@@ -468,6 +563,63 @@ mod tests {
         host_ep.close().await;
         p1_ep.close().await;
         p2_ep.close().await;
+    }
+
+    #[tokio::test]
+    async fn chunked_upload_lands_large_file_intact() {
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("XDG_CACHE_HOME", dir.path());
+        let p = setup(dir.path(), None).await;
+        let (out_tx, _out_rx) = mpsc::channel(16);
+        let _srv = spawn_phone_server(
+            p.host_ep.clone(),
+            p.reg.clone(),
+            p.roster.clone(),
+            out_tx,
+            p.presence.clone(),
+        );
+
+        let mut client = PhoneClient::connect(&p.phone_ep, p.host_addr.clone())
+            .await
+            .unwrap();
+        client.hello(None, HashMap::new()).await.unwrap();
+
+        // ~40 MiB, deterministic so integrity is verifiable. Far past MAX_FRAME
+        // (8 MiB) as a single blob — proves chunking sidesteps the frame cap.
+        let total = 40 * 1024 * 1024;
+        let mut data = Vec::with_capacity(total);
+        for i in 0..total {
+            data.push((i % 251) as u8);
+        }
+
+        let req = 1u64;
+        client.upload_start(req, "big.bin").await.unwrap();
+        for chunk in data.chunks(1 << 20) {
+            // Each frame must stay under MAX_FRAME or this send errors.
+            client.upload_chunk(req, chunk).await.unwrap();
+        }
+        client.upload_finish(req).await.unwrap();
+
+        let path = loop {
+            let m = tokio::time::timeout(Duration::from_secs(30), client.next_msg())
+                .await
+                .unwrap()
+                .unwrap();
+            match m {
+                WireMsg::UploadDone { req: r, path } if r == req => break path,
+                WireMsg::FsError { req: r, message } if r == req => {
+                    panic!("upload failed: {message}")
+                }
+                _ => continue,
+            }
+        };
+
+        let landed = std::fs::read(&path).unwrap();
+        assert_eq!(landed.len(), data.len(), "size mismatch");
+        assert!(landed == data, "landed bytes differ from source");
+
+        p.host_ep.close().await;
+        p.phone_ep.close().await;
     }
 
     #[tokio::test]

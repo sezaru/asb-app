@@ -18,9 +18,25 @@ pub enum Payload {
         status: ToolStatus,
         content: Vec<Content>,
     },
-    Plan { entries: Vec<String> },
+    Plan { entries: Vec<PlanEntry> },
     Usage { input: u64, output: u64 },
     UserMessage { text: String },
+}
+
+/// One plan step, as agent-shell exposes it: its prose plus a lifecycle status
+/// so the client can render real progress instead of guessing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlanEntry {
+    pub content: String,
+    pub status: PlanStatus,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlanStatus {
+    Pending,
+    InProgress,
+    Completed,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -68,6 +84,45 @@ pub enum Content {
 pub enum SessionState {
     Running,
     Idle,
+}
+
+/// A selectable agent option (a model, a session/permission mode, or a thinking
+/// level). `id` is what the agent wants back; `name` is the human label.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfigOption {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// One slash command the agent advertises, for the composer's autocomplete.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommandInfo {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// The live, backend-authoritative knobs for a session: what the agent supports
+/// and what is currently selected. Nothing here is hardcoded on the phone — the
+/// provider fills it from agent-shell's own state and the phone mirrors it.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct SessionConfig {
+    #[serde(default)]
+    pub models: Vec<ConfigOption>,
+    #[serde(default)]
+    pub current_model: Option<String>,
+    #[serde(default)]
+    pub modes: Vec<ConfigOption>,
+    #[serde(default)]
+    pub current_mode: Option<String>,
+    #[serde(default)]
+    pub thought_levels: Vec<ConfigOption>,
+    #[serde(default)]
+    pub current_thought: Option<String>,
+    #[serde(default)]
+    pub commands: Vec<CommandInfo>,
 }
 
 /// One mirrored event, ordered by `seq`, grouped into a turn by `turn`.

@@ -64,7 +64,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -2076565521;
+  int get rustContentHash => -2056013984;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -104,8 +104,21 @@ abstract class RustLibApi extends BaseApi {
     required String option,
   });
 
+  Future<void> crateApiClientRustSessionCommand({
+    required RustSession that,
+    required String session,
+    required String name,
+    String? arg,
+  });
+
   Stream<HostEventDto> crateApiClientRustSessionEvents({
     required RustSession that,
+  });
+
+  Future<void> crateApiClientRustSessionFsList({
+    required RustSession that,
+    required BigInt req,
+    String? path,
   });
 
   Future<void> crateApiClientRustSessionHello({
@@ -123,6 +136,23 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiClientRustSessionInterrupt({
     required RustSession that,
     required String session,
+  });
+
+  Future<void> crateApiClientRustSessionUploadChunk({
+    required RustSession that,
+    required BigInt req,
+    required String dataB64,
+  });
+
+  Future<void> crateApiClientRustSessionUploadFinish({
+    required RustSession that,
+    required BigInt req,
+  });
+
+  Future<void> crateApiClientRustSessionUploadStart({
+    required RustSession that,
+    required BigInt req,
+    required String name,
   });
 
   RustArcIncrementStrongCountFnType
@@ -400,6 +430,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiClientRustSessionCommand({
+    required RustSession that,
+    required String session,
+    required String name,
+    String? arg,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_String(session, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_opt_String(arg, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionCommandConstMeta,
+        argValues: [that, session, name, arg],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionCommandConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_command",
+        argNames: ["that", "session", "name", "arg"],
+      );
+
+  @override
   Stream<HostEventDto> crateApiClientRustSessionEvents({
     required RustSession that,
   }) {
@@ -417,7 +489,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 9,
               port: port_,
             );
           },
@@ -441,6 +513,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiClientRustSessionFsList({
+    required RustSession that,
+    required BigInt req,
+    String? path,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_u_64(req, serializer);
+          sse_encode_opt_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionFsListConstMeta,
+        argValues: [that, req, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionFsListConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_fs_list",
+        argNames: ["that", "req", "path"],
+      );
+
+  @override
   Future<void> crateApiClientRustSessionHello({
     required RustSession that,
     String? fcm,
@@ -459,7 +571,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 11,
             port: port_,
           );
         },
@@ -499,7 +611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 12,
             port: port_,
           );
         },
@@ -537,7 +649,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 13,
             port: port_,
           );
         },
@@ -556,6 +668,124 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "RustSession_interrupt",
         argNames: ["that", "session"],
+      );
+
+  @override
+  Future<void> crateApiClientRustSessionUploadChunk({
+    required RustSession that,
+    required BigInt req,
+    required String dataB64,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_u_64(req, serializer);
+          sse_encode_String(dataB64, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionUploadChunkConstMeta,
+        argValues: [that, req, dataB64],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionUploadChunkConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_upload_chunk",
+        argNames: ["that", "req", "dataB64"],
+      );
+
+  @override
+  Future<void> crateApiClientRustSessionUploadFinish({
+    required RustSession that,
+    required BigInt req,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_u_64(req, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionUploadFinishConstMeta,
+        argValues: [that, req],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionUploadFinishConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_upload_finish",
+        argNames: ["that", "req"],
+      );
+
+  @override
+  Future<void> crateApiClientRustSessionUploadStart({
+    required RustSession that,
+    required BigInt req,
+    required String name,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerRustSession(
+            that,
+            serializer,
+          );
+          sse_encode_u_64(req, serializer);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiClientRustSessionUploadStartConstMeta,
+        argValues: [that, req, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRustSessionUploadStartConstMeta =>
+      const TaskConstMeta(
+        debugName: "RustSession_upload_start",
+        argNames: ["that", "req", "name"],
       );
 
   RustArcIncrementStrongCountFnType
@@ -661,9 +891,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SessionConfigDto dco_decode_box_autoadd_session_config_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_session_config_dto(raw);
+  }
+
+  @protected
   UpdateDto dco_decode_box_autoadd_update_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_update_dto(raw);
+  }
+
+  @protected
+  CommandInfoDto dco_decode_command_info_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return CommandInfoDto(
+      name: dco_decode_String(arr[0]),
+      description: dco_decode_opt_String(arr[1]),
+    );
+  }
+
+  @protected
+  ConfigOptionDto dco_decode_config_option_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ConfigOptionDto(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      description: dco_decode_opt_String(arr[2]),
+    );
   }
 
   @protected
@@ -677,6 +938,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       text: dco_decode_opt_String(arr[1]),
       path: dco_decode_opt_String(arr[2]),
       diff: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  FsEntryDto dco_decode_fs_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return FsEntryDto(
+      name: dco_decode_String(arr[0]),
+      path: dco_decode_String(arr[1]),
+      isDir: dco_decode_bool(arr[2]),
     );
   }
 
@@ -715,6 +989,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           id: dco_decode_String(raw[2]),
         );
       case 5:
+        return HostEventDto_Config(
+          session: dco_decode_String(raw[1]),
+          config: dco_decode_box_autoadd_session_config_dto(raw[2]),
+        );
+      case 6:
+        return HostEventDto_FsEntries(
+          req: dco_decode_u_64(raw[1]),
+          dir: dco_decode_String(raw[2]),
+          parent: dco_decode_opt_String(raw[3]),
+          entries: dco_decode_list_fs_entry_dto(raw[4]),
+        );
+      case 7:
+        return HostEventDto_UploadDone(
+          req: dco_decode_u_64(raw[1]),
+          path: dco_decode_String(raw[2]),
+        );
+      case 8:
+        return HostEventDto_FsError(
+          req: dco_decode_u_64(raw[1]),
+          message: dco_decode_String(raw[2]),
+        );
+      case 9:
         return HostEventDto_Disconnected();
       default:
         throw Exception("unreachable");
@@ -728,9 +1024,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<CommandInfoDto> dco_decode_list_command_info_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_command_info_dto).toList();
+  }
+
+  @protected
+  List<ConfigOptionDto> dco_decode_list_config_option_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_config_option_dto).toList();
+  }
+
+  @protected
   List<ContentDto> dco_decode_list_content_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_content_dto).toList();
+  }
+
+  @protected
+  List<FsEntryDto> dco_decode_list_fs_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_fs_entry_dto).toList();
   }
 
   @protected
@@ -743,6 +1057,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<PermOptionDto> dco_decode_list_perm_option_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_perm_option_dto).toList();
+  }
+
+  @protected
+  List<PlanEntryDto> dco_decode_list_plan_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_plan_entry_dto).toList();
   }
 
   @protected
@@ -790,7 +1110,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           content: dco_decode_list_content_dto(raw[3]),
         );
       case 5:
-        return PayloadDto_Plan(entries: dco_decode_list_String(raw[1]));
+        return PayloadDto_Plan(entries: dco_decode_list_plan_entry_dto(raw[1]));
       case 6:
         return PayloadDto_Usage(
           input: dco_decode_u_64(raw[1]),
@@ -824,6 +1144,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       id: dco_decode_String(arr[1]),
       command: dco_decode_String(arr[2]),
       options: dco_decode_list_perm_option_dto(arr[3]),
+    );
+  }
+
+  @protected
+  PlanEntryDto dco_decode_plan_entry_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return PlanEntryDto(
+      content: dco_decode_String(arr[0]),
+      status: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  SessionConfigDto dco_decode_session_config_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return SessionConfigDto(
+      models: dco_decode_list_config_option_dto(arr[0]),
+      currentModel: dco_decode_opt_String(arr[1]),
+      modes: dco_decode_list_config_option_dto(arr[2]),
+      currentMode: dco_decode_opt_String(arr[3]),
+      thoughtLevels: dco_decode_list_config_option_dto(arr[4]),
+      currentThought: dco_decode_opt_String(arr[5]),
+      commands: dco_decode_list_command_info_dto(arr[6]),
     );
   }
 
@@ -988,9 +1337,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SessionConfigDto sse_decode_box_autoadd_session_config_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_session_config_dto(deserializer));
+  }
+
+  @protected
   UpdateDto sse_decode_box_autoadd_update_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_update_dto(deserializer));
+  }
+
+  @protected
+  CommandInfoDto sse_decode_command_info_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_description = sse_decode_opt_String(deserializer);
+    return CommandInfoDto(name: var_name, description: var_description);
+  }
+
+  @protected
+  ConfigOptionDto sse_decode_config_option_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_description = sse_decode_opt_String(deserializer);
+    return ConfigOptionDto(
+      id: var_id,
+      name: var_name,
+      description: var_description,
+    );
   }
 
   @protected
@@ -1006,6 +1384,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       path: var_path,
       diff: var_diff,
     );
+  }
+
+  @protected
+  FsEntryDto sse_decode_fs_entry_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    var var_isDir = sse_decode_bool(deserializer);
+    return FsEntryDto(name: var_name, path: var_path, isDir: var_isDir);
   }
 
   @protected
@@ -1045,6 +1432,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           id: var_id,
         );
       case 5:
+        var var_session = sse_decode_String(deserializer);
+        var var_config = sse_decode_box_autoadd_session_config_dto(
+          deserializer,
+        );
+        return HostEventDto_Config(session: var_session, config: var_config);
+      case 6:
+        var var_req = sse_decode_u_64(deserializer);
+        var var_dir = sse_decode_String(deserializer);
+        var var_parent = sse_decode_opt_String(deserializer);
+        var var_entries = sse_decode_list_fs_entry_dto(deserializer);
+        return HostEventDto_FsEntries(
+          req: var_req,
+          dir: var_dir,
+          parent: var_parent,
+          entries: var_entries,
+        );
+      case 7:
+        var var_req = sse_decode_u_64(deserializer);
+        var var_path = sse_decode_String(deserializer);
+        return HostEventDto_UploadDone(req: var_req, path: var_path);
+      case 8:
+        var var_req = sse_decode_u_64(deserializer);
+        var var_message = sse_decode_String(deserializer);
+        return HostEventDto_FsError(req: var_req, message: var_message);
+      case 9:
         return HostEventDto_Disconnected();
       default:
         throw UnimplementedError('');
@@ -1064,6 +1476,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<CommandInfoDto> sse_decode_list_command_info_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CommandInfoDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_command_info_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ConfigOptionDto> sse_decode_list_config_option_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ConfigOptionDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_config_option_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ContentDto> sse_decode_list_content_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1071,6 +1511,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ContentDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_content_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<FsEntryDto> sse_decode_list_fs_entry_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <FsEntryDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_fs_entry_dto(deserializer));
     }
     return ans_;
   }
@@ -1099,6 +1551,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <PermOptionDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_perm_option_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PlanEntryDto> sse_decode_list_plan_entry_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PlanEntryDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_plan_entry_dto(deserializer));
     }
     return ans_;
   }
@@ -1177,7 +1643,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           content: var_content,
         );
       case 5:
-        var var_entries = sse_decode_list_String(deserializer);
+        var var_entries = sse_decode_list_plan_entry_dto(deserializer);
         return PayloadDto_Plan(entries: var_entries);
       case 6:
         var var_input = sse_decode_u_64(deserializer);
@@ -1208,6 +1674,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       id: var_id,
       command: var_command,
       options: var_options,
+    );
+  }
+
+  @protected
+  PlanEntryDto sse_decode_plan_entry_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_content = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    return PlanEntryDto(content: var_content, status: var_status);
+  }
+
+  @protected
+  SessionConfigDto sse_decode_session_config_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_models = sse_decode_list_config_option_dto(deserializer);
+    var var_currentModel = sse_decode_opt_String(deserializer);
+    var var_modes = sse_decode_list_config_option_dto(deserializer);
+    var var_currentMode = sse_decode_opt_String(deserializer);
+    var var_thoughtLevels = sse_decode_list_config_option_dto(deserializer);
+    var var_currentThought = sse_decode_opt_String(deserializer);
+    var var_commands = sse_decode_list_command_info_dto(deserializer);
+    return SessionConfigDto(
+      models: var_models,
+      currentModel: var_currentModel,
+      modes: var_modes,
+      currentMode: var_currentMode,
+      thoughtLevels: var_thoughtLevels,
+      currentThought: var_currentThought,
+      commands: var_commands,
     );
   }
 
@@ -1396,6 +1891,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_session_config_dto(
+    SessionConfigDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_session_config_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_update_dto(
     UpdateDto self,
     SseSerializer serializer,
@@ -1405,12 +1909,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_command_info_dto(
+    CommandInfoDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.description, serializer);
+  }
+
+  @protected
+  void sse_encode_config_option_dto(
+    ConfigOptionDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.description, serializer);
+  }
+
+  @protected
   void sse_encode_content_dto(ContentDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.kind, serializer);
     sse_encode_opt_String(self.text, serializer);
     sse_encode_opt_String(self.path, serializer);
     sse_encode_opt_String(self.diff, serializer);
+  }
+
+  @protected
+  void sse_encode_fs_entry_dto(FsEntryDto self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.path, serializer);
+    sse_encode_bool(self.isDir, serializer);
   }
 
   @protected
@@ -1444,8 +1977,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(4, serializer);
         sse_encode_String(session, serializer);
         sse_encode_String(id, serializer);
-      case HostEventDto_Disconnected():
+      case HostEventDto_Config(session: final session, config: final config):
         sse_encode_i_32(5, serializer);
+        sse_encode_String(session, serializer);
+        sse_encode_box_autoadd_session_config_dto(config, serializer);
+      case HostEventDto_FsEntries(
+        req: final req,
+        dir: final dir,
+        parent: final parent,
+        entries: final entries,
+      ):
+        sse_encode_i_32(6, serializer);
+        sse_encode_u_64(req, serializer);
+        sse_encode_String(dir, serializer);
+        sse_encode_opt_String(parent, serializer);
+        sse_encode_list_fs_entry_dto(entries, serializer);
+      case HostEventDto_UploadDone(req: final req, path: final path):
+        sse_encode_i_32(7, serializer);
+        sse_encode_u_64(req, serializer);
+        sse_encode_String(path, serializer);
+      case HostEventDto_FsError(req: final req, message: final message):
+        sse_encode_i_32(8, serializer);
+        sse_encode_u_64(req, serializer);
+        sse_encode_String(message, serializer);
+      case HostEventDto_Disconnected():
+        sse_encode_i_32(9, serializer);
     }
   }
 
@@ -1459,6 +2015,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_command_info_dto(
+    List<CommandInfoDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_command_info_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_config_option_dto(
+    List<ConfigOptionDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_config_option_dto(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_content_dto(
     List<ContentDto> self,
     SseSerializer serializer,
@@ -1467,6 +2047,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_content_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_fs_entry_dto(
+    List<FsEntryDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_fs_entry_dto(item, serializer);
     }
   }
 
@@ -1491,6 +2083,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_perm_option_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_plan_entry_dto(
+    List<PlanEntryDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_plan_entry_dto(item, serializer);
     }
   }
 
@@ -1567,7 +2171,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_list_content_dto(content, serializer);
       case PayloadDto_Plan(entries: final entries):
         sse_encode_i_32(5, serializer);
-        sse_encode_list_String(entries, serializer);
+        sse_encode_list_plan_entry_dto(entries, serializer);
       case PayloadDto_Usage(input: final input, output: final output):
         sse_encode_i_32(6, serializer);
         sse_encode_u_64(input, serializer);
@@ -1595,6 +2199,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.command, serializer);
     sse_encode_list_perm_option_dto(self.options, serializer);
+  }
+
+  @protected
+  void sse_encode_plan_entry_dto(PlanEntryDto self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.content, serializer);
+    sse_encode_String(self.status, serializer);
+  }
+
+  @protected
+  void sse_encode_session_config_dto(
+    SessionConfigDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_config_option_dto(self.models, serializer);
+    sse_encode_opt_String(self.currentModel, serializer);
+    sse_encode_list_config_option_dto(self.modes, serializer);
+    sse_encode_opt_String(self.currentMode, serializer);
+    sse_encode_list_config_option_dto(self.thoughtLevels, serializer);
+    sse_encode_opt_String(self.currentThought, serializer);
+    sse_encode_list_command_info_dto(self.commands, serializer);
   }
 
   @protected
@@ -1726,11 +2352,32 @@ class RustSessionImpl extends RustOpaque implements RustSession {
     option: option,
   );
 
+  /// Send a slash command (e.g. `/model`, `/mode`, `/thought`, `/compact`) to
+  /// the host. `arg` is the value for setters like `/model <id>`.
+  Future<void> command({
+    required String session,
+    required String name,
+    String? arg,
+  }) => RustLib.instance.api.crateApiClientRustSessionCommand(
+    that: this,
+    session: session,
+    name: name,
+    arg: arg,
+  );
+
   /// Stream inbound host events until the connection drops. Callable once; the
   /// returned future runs the receive loop, so frb turns this into a Dart
   /// `Stream<HostEventDto>`.
   Stream<HostEventDto> events() =>
       RustLib.instance.api.crateApiClientRustSessionEvents(that: this);
+
+  /// Browse the HOST filesystem. `path` None starts at home. The reply arrives
+  /// on the event stream as `HostEventDto::FsEntries` (or `FsError`), matched
+  /// by `req`.
+  Future<void> fsList({required BigInt req, String? path}) => RustLib
+      .instance
+      .api
+      .crateApiClientRustSessionFsList(that: this, req: req, path: path);
 
   Future<void> hello({String? fcm, required List<HighWaterDto> highWater}) =>
       RustLib.instance.api.crateApiClientRustSessionHello(
@@ -1746,4 +2393,27 @@ class RustSessionImpl extends RustOpaque implements RustSession {
 
   Future<void> interrupt({required String session}) => RustLib.instance.api
       .crateApiClientRustSessionInterrupt(that: this, session: session);
+
+  /// Send one base64-encoded slice of the upload under `req`.
+  Future<void> uploadChunk({required BigInt req, required String dataB64}) =>
+      RustLib.instance.api.crateApiClientRustSessionUploadChunk(
+        that: this,
+        req: req,
+        dataB64: dataB64,
+      );
+
+  /// Seal the upload under `req`; the host replies `UploadDone` with the path.
+  Future<void> uploadFinish({required BigInt req}) => RustLib.instance.api
+      .crateApiClientRustSessionUploadFinish(that: this, req: req);
+
+  /// Begin a chunked attachment upload. Bytes follow via [`upload_chunk`];
+  /// [`upload_finish`] seals it and the landed path returns as
+  /// `HostEventDto::UploadDone`. Streaming keeps every frame small and the
+  /// phone's working set to one chunk.
+  Future<void> uploadStart({required BigInt req, required String name}) =>
+      RustLib.instance.api.crateApiClientRustSessionUploadStart(
+        that: this,
+        req: req,
+        name: name,
+      );
 }

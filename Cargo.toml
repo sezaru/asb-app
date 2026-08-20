@@ -12,8 +12,10 @@ ciborium = "0.2"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand = "0.8"
 iroh = { version = "1.0.0", features = ["platform-verifier"] }
+iroh-mdns-address-lookup = "0.5"
 roam-pake = { path = "../roam/roam-sync/crates/roam-pake" }
 base64 = "0.22"
+serde_bytes = "0.11"
 async-trait = "0.1"
 fs2 = "0.4"
 tracing = "0.1"

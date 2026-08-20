@@ -2,6 +2,7 @@ use anyhow::Context;
 use iroh::endpoint::presets;
 use iroh::endpoint::{RecvStream, SendStream};
 use iroh::{Endpoint, SecretKey};
+use iroh_mdns_address_lookup::MdnsAddressLookup;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Steady-state ALPN: a rostered phone streams session updates + drives input.
@@ -13,7 +14,10 @@ pub const MAX_FRAME: usize = 8 * 1024 * 1024;
 
 /// The one iroh endpoint for this device, bound to `secret_32` (so the NodeId
 /// equals the ed25519 verifying key), serving both the steady-state and pairing
-/// ALPNs, with n0 discovery (pkarr/DNS/relay — needs the public internet).
+/// ALPNs. N0 discovery (pkarr/DNS/relay) handles the public-internet path;
+/// mDNS address lookup advertises this device's LAN addresses so two peers on
+/// the same network hole-punch a direct link instead of relaying everything
+/// (same-NAT peers can't hairpin their public reflexive address).
 pub async fn build_endpoint(secret_32: [u8; 32]) -> anyhow::Result<Endpoint> {
     let secret = SecretKey::from_bytes(&secret_32);
     let endpoint = Endpoint::builder(presets::N0)
@@ -21,6 +25,19 @@ pub async fn build_endpoint(secret_32: [u8; 32]) -> anyhow::Result<Endpoint> {
         .alpns(vec![ASB_ALPN.to_vec(), PAIR_ALPN.to_vec()])
         .bind()
         .await?;
+    // mDNS is best-effort and added AFTER bind on purpose: on Android the
+    // multicast socket can fail to bind (needs a WifiManager.MulticastLock), and
+    // if that were passed into `.bind()` iroh's `into_address_lookup(&ep)?` would
+    // sink the ENTIRE endpoint — no iroh at all. Post-bind, a failure just drops
+    // the LAN direct-path optimization; the relay/pkarr path stays intact.
+    match MdnsAddressLookup::builder().build(endpoint.id()) {
+        Ok(mdns) => {
+            if let Ok(lookup) = endpoint.address_lookup() {
+                lookup.add(mdns);
+            }
+        }
+        Err(e) => tracing::warn!("mDNS local discovery unavailable: {e:#}"),
+    }
     Ok(endpoint)
 }
 

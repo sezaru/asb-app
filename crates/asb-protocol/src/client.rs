@@ -84,6 +84,31 @@ impl PhoneClient {
         .await
     }
 
+    pub async fn command(&mut self, session: &str, name: &str, arg: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::Command {
+            session: session.into(),
+            name: name.into(),
+            arg,
+        })
+        .await
+    }
+
+    pub async fn fs_list(&mut self, req: u64, path: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::FsList { req, path }).await
+    }
+
+    pub async fn upload_start(&mut self, req: u64, name: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadStart { req, name: name.into() }).await
+    }
+
+    pub async fn upload_chunk(&mut self, req: u64, data: &[u8]) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadChunk { req, data: data.to_vec() }).await
+    }
+
+    pub async fn upload_finish(&mut self, req: u64) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadFinish { req }).await
+    }
+
     /// Split into independent send/receive halves sharing the connection, so a
     /// receive loop and outbound sends run in separate tasks. A `select!` over
     /// one stream's read + write would cancel a half-read frame and corrupt it;
@@ -166,6 +191,31 @@ impl PhoneSender {
             session: session.into(),
         })
         .await
+    }
+
+    pub async fn command(&mut self, session: &str, name: &str, arg: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::Command {
+            session: session.into(),
+            name: name.into(),
+            arg,
+        })
+        .await
+    }
+
+    pub async fn fs_list(&mut self, req: u64, path: Option<String>) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::FsList { req, path }).await
+    }
+
+    pub async fn upload_start(&mut self, req: u64, name: &str) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadStart { req, name: name.into() }).await
+    }
+
+    pub async fn upload_chunk(&mut self, req: u64, data: &[u8]) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadChunk { req, data: data.to_vec() }).await
+    }
+
+    pub async fn upload_finish(&mut self, req: u64) -> anyhow::Result<()> {
+        self.send_msg(&WireMsg::UploadFinish { req }).await
     }
 }
 

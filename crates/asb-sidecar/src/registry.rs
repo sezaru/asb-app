@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use asb_protocol::emacs::EmacsIn;
-use asb_protocol::model::{Payload, SessionId, SessionState, Seq, TurnId, Update};
+use asb_protocol::model::{Payload, SessionConfig, SessionId, SessionState, Seq, TurnId, Update};
 use asb_protocol::replay::ReplayLog;
 use asb_protocol::wire::{SessionMeta, WireMsg};
 use tokio::sync::{broadcast, watch};
@@ -45,6 +45,9 @@ struct SessionEntry {
     /// reports Running, so a second prompt racing within the same RTT loses.
     /// Cleared by the next Status from Emacs (which is then authoritative).
     input_claimed: bool,
+    /// Latest backend knobs (models/modes/thought + commands) for this session,
+    /// mirrored to phones. Empty until the provider sends its first `Config`.
+    config: SessionConfig,
 }
 
 impl Registry {
@@ -184,6 +187,7 @@ impl Registry {
                             turn: 0,
                             owner: conn,
                             input_claimed: false,
+                            config: SessionConfig::default(),
                         },
                     );
                     // Announce the new session to phones already connected, so it
@@ -261,6 +265,12 @@ impl Registry {
                 self.pending_perms.lock().unwrap().retain(|(s, _)| s != &session);
                 let _ = self.active_tx.send(sessions.len());
             }
+            EmacsIn::Config { session, config } => {
+                if let Some(entry) = sessions.get_mut(&session) {
+                    entry.config = config.clone();
+                    let _ = self.tx.send(WireMsg::Config { session, config });
+                }
+            }
             // Handled synchronously in the emacs server (it needs the boolean
             // reply); never reaches the registry's async dispatch.
             EmacsIn::SessionClaim { .. } => {}
@@ -304,6 +314,19 @@ impl Registry {
                 state: e.state,
                 last_seq: e.log.last_seq(),
             })
+            .collect()
+    }
+
+    /// Every session's stored config, for the initial burst to a connecting
+    /// phone. Sessions still at the default (provider hasn't sent one) are
+    /// skipped — there's nothing to mirror yet.
+    pub fn configs(&self) -> Vec<(SessionId, SessionConfig)> {
+        self.sessions
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, e)| e.config != SessionConfig::default())
+            .map(|(id, e)| (id.clone(), e.config.clone()))
             .collect()
     }
 

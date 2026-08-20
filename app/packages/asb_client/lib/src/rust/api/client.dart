@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'client.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `hex`, `map_content`, `map_event`, `map_meta`, `map_payload`, `map_update`, `parse_hex32`
+// These functions are ignored because they are not marked as `pub`: `hex`, `map_config`, `map_content`, `map_event`, `map_meta`, `map_payload`, `map_plan_entry`, `map_update`, `parse_hex32`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<RustClient>>
 abstract class RustClient implements RustOpaqueInterface {
@@ -47,16 +47,83 @@ abstract class RustSession implements RustOpaqueInterface {
     required String option,
   });
 
+  /// Send a slash command (e.g. `/model`, `/mode`, `/thought`, `/compact`) to
+  /// the host. `arg` is the value for setters like `/model <id>`.
+  Future<void> command({
+    required String session,
+    required String name,
+    String? arg,
+  });
+
   /// Stream inbound host events until the connection drops. Callable once; the
   /// returned future runs the receive loop, so frb turns this into a Dart
   /// `Stream<HostEventDto>`.
   Stream<HostEventDto> events();
+
+  /// Browse the HOST filesystem. `path` None starts at home. The reply arrives
+  /// on the event stream as `HostEventDto::FsEntries` (or `FsError`), matched
+  /// by `req`.
+  Future<void> fsList({required BigInt req, String? path});
 
   Future<void> hello({String? fcm, required List<HighWaterDto> highWater});
 
   Future<void> input({required String session, required String text});
 
   Future<void> interrupt({required String session});
+
+  /// Send one base64-encoded slice of the upload under `req`.
+  Future<void> uploadChunk({required BigInt req, required String dataB64});
+
+  /// Seal the upload under `req`; the host replies `UploadDone` with the path.
+  Future<void> uploadFinish({required BigInt req});
+
+  /// Begin a chunked attachment upload. Bytes follow via [`upload_chunk`];
+  /// [`upload_finish`] seals it and the landed path returns as
+  /// `HostEventDto::UploadDone`. Streaming keeps every frame small and the
+  /// phone's working set to one chunk.
+  Future<void> uploadStart({required BigInt req, required String name});
+}
+
+class CommandInfoDto {
+  final String name;
+  final String? description;
+
+  const CommandInfoDto({required this.name, this.description});
+
+  @override
+  int get hashCode => name.hashCode ^ description.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CommandInfoDto &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          description == other.description;
+}
+
+class ConfigOptionDto {
+  final String id;
+  final String name;
+  final String? description;
+
+  const ConfigOptionDto({
+    required this.id,
+    required this.name,
+    this.description,
+  });
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode ^ description.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ConfigOptionDto &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          description == other.description;
 }
 
 /// One content block: `kind` is `"text"`/`"diff"`/`"file_ref"` and only the
@@ -82,6 +149,30 @@ class ContentDto {
           text == other.text &&
           path == other.path &&
           diff == other.diff;
+}
+
+class FsEntryDto {
+  final String name;
+  final String path;
+  final bool isDir;
+
+  const FsEntryDto({
+    required this.name,
+    required this.path,
+    required this.isDir,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ path.hashCode ^ isDir.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FsEntryDto &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          path == other.path &&
+          isDir == other.isDir;
 }
 
 /// A per-session catch-up high-water mark passed to `hello`.
@@ -120,6 +211,30 @@ sealed class HostEventDto with _$HostEventDto {
     required String session,
     required String id,
   }) = HostEventDto_PermissionResolved;
+  const factory HostEventDto.config({
+    required String session,
+    required SessionConfigDto config,
+  }) = HostEventDto_Config;
+
+  /// Reply to `fs_list`, matched by `req`.
+  const factory HostEventDto.fsEntries({
+    required BigInt req,
+    required String dir,
+    String? parent,
+    required List<FsEntryDto> entries,
+  }) = HostEventDto_FsEntries;
+
+  /// Reply to `upload`, matched by `req`: the attachment's host path.
+  const factory HostEventDto.uploadDone({
+    required BigInt req,
+    required String path,
+  }) = HostEventDto_UploadDone;
+
+  /// A browse or upload failed, matched by `req`.
+  const factory HostEventDto.fsError({
+    required BigInt req,
+    required String message,
+  }) = HostEventDto_FsError;
   const factory HostEventDto.disconnected() = HostEventDto_Disconnected;
 }
 
@@ -146,7 +261,7 @@ sealed class PayloadDto with _$PayloadDto {
     required String status,
     required List<ContentDto> content,
   }) = PayloadDto_ToolCallUpdate;
-  const factory PayloadDto.plan({required List<String> entries}) =
+  const factory PayloadDto.plan({required List<PlanEntryDto> entries}) =
       PayloadDto_Plan;
   const factory PayloadDto.usage({
     required BigInt input,
@@ -198,6 +313,70 @@ class PermissionReqDto {
           id == other.id &&
           command == other.command &&
           options == other.options;
+}
+
+class PlanEntryDto {
+  final String content;
+
+  /// `"pending"` | `"in_progress"` | `"completed"`.
+  final String status;
+
+  const PlanEntryDto({required this.content, required this.status});
+
+  @override
+  int get hashCode => content.hashCode ^ status.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlanEntryDto &&
+          runtimeType == other.runtimeType &&
+          content == other.content &&
+          status == other.status;
+}
+
+/// A session's backend knobs, flattened for Dart.
+class SessionConfigDto {
+  final List<ConfigOptionDto> models;
+  final String? currentModel;
+  final List<ConfigOptionDto> modes;
+  final String? currentMode;
+  final List<ConfigOptionDto> thoughtLevels;
+  final String? currentThought;
+  final List<CommandInfoDto> commands;
+
+  const SessionConfigDto({
+    required this.models,
+    this.currentModel,
+    required this.modes,
+    this.currentMode,
+    required this.thoughtLevels,
+    this.currentThought,
+    required this.commands,
+  });
+
+  @override
+  int get hashCode =>
+      models.hashCode ^
+      currentModel.hashCode ^
+      modes.hashCode ^
+      currentMode.hashCode ^
+      thoughtLevels.hashCode ^
+      currentThought.hashCode ^
+      commands.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SessionConfigDto &&
+          runtimeType == other.runtimeType &&
+          models == other.models &&
+          currentModel == other.currentModel &&
+          modes == other.modes &&
+          currentMode == other.currentMode &&
+          thoughtLevels == other.thoughtLevels &&
+          currentThought == other.currentThought &&
+          commands == other.commands;
 }
 
 class SessionMetaDto {

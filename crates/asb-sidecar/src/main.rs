@@ -100,13 +100,57 @@ async fn run(dir: PathBuf, identity: Identity, roster_path: PathBuf) -> anyhow::
         Arc::new(NoopPush),
         host_id,
     );
-    let _srv = spawn_phone_server(ep.clone(), reg, roster, out_tx, presence);
+    let _srv = spawn_phone_server(ep.clone(), reg, roster.clone(), out_tx, presence);
+
+    // ASB_WATCH: log each rostered peer's live path type (DIRECT ip vs RELAY)
+    // every 2s. A diagnostic for confirming iroh hole-punches instead of
+    // relaying; harmless when the env var is unset.
+    if std::env::var_os("ASB_WATCH").is_some() {
+        let ep_w = ep.clone();
+        let roster_w = roster.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                let ids: Vec<[u8; 32]> =
+                    { roster_w.lock().unwrap().entries().iter().map(|e| e.node_id).collect() };
+                for nid in ids {
+                    let Ok(id) = iroh::EndpointId::from_bytes(&nid) else { continue };
+                    match ep_w.remote_info(id).await {
+                        Some(info) => {
+                            let active: Vec<String> = info
+                                .addrs()
+                                .filter(|a| {
+                                    matches!(a.usage(), iroh::endpoint::TransportAddrUsage::Active)
+                                })
+                                .map(|a| a.addr().to_string())
+                                .collect();
+                            let direct = active.iter().any(|s| s.starts_with("ip:"));
+                            tracing::info!(
+                                peer = %hex(nid),
+                                path = if direct { "DIRECT" } else { "RELAY" },
+                                active = ?active,
+                                "conn-watch"
+                            );
+                        }
+                        None => tracing::info!(peer = %hex(nid), "conn-watch: not connected"),
+                    }
+                }
+            }
+        });
+    }
 
     // Lifetime = live agent-shell buffers (active sessions), NOT the spawning
-    // Emacs. Exit when the last buffer anywhere closes.
-    tokio::select! {
-        _ = tokio::signal::ctrl_c() => tracing::info!("interrupted"),
-        _ = wait_until_idle(active) => tracing::info!("no active sessions; shutting down"),
+    // Emacs. Exit when the last buffer anywhere closes. ASB_KEEPALIVE pins the
+    // daemon up (network diagnostics: no Emacs session needed).
+    if std::env::var_os("ASB_KEEPALIVE").is_some() {
+        let _ = active;
+        tokio::signal::ctrl_c().await.ok();
+        tracing::info!("keepalive: interrupted");
+    } else {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => tracing::info!("interrupted"),
+            _ = wait_until_idle(active) => tracing::info!("no active sessions; shutting down"),
+        }
     }
     ep.close().await;
     Ok(())

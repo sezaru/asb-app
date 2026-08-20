@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::emacs::PermOption;
-use crate::model::{SessionId, SessionState, Seq, Update};
+use crate::model::{SessionConfig, SessionId, SessionState, Seq, Update};
 
 /// Sidecar <-> phone, framed CBOR over an iroh bidirectional stream.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,6 +35,33 @@ pub enum WireMsg {
     Interrupt {
         session: SessionId,
     },
+    /// Browse the HOST machine's filesystem (the sidecar's own FS). `path` None
+    /// means "start at the user's home". `req` correlates the reply to the phone
+    /// that asked, so concurrent browses on one connection don't cross.
+    FsList {
+        req: u64,
+        path: Option<String>,
+    },
+    /// Begin a chunked attachment upload: the sidecar opens a file for `name`.
+    /// The bytes follow as `UploadChunk`s and `UploadFinish` seals it. Chunking
+    /// keeps every frame well under `MAX_FRAME` and the phone's working set to
+    /// one chunk regardless of file size.
+    UploadStart {
+        req: u64,
+        name: String,
+    },
+    /// One raw byte slice of the file being uploaded under `req`. `serde_bytes`
+    /// keeps it a CBOR byte string (not an int array), so the wire carries the
+    /// bytes verbatim — no base64 inflation or encode/decode on either end.
+    UploadChunk {
+        req: u64,
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
+    /// Seal the upload under `req`; the sidecar flushes and replies `UploadDone`.
+    UploadFinish {
+        req: u64,
+    },
     // host -> phone
     SessionList {
         sessions: Vec<SessionMeta>,
@@ -56,6 +83,32 @@ pub enum WireMsg {
         session: SessionId,
         id: String,
     },
+    /// The session's backend-authoritative knobs: available models / modes /
+    /// thinking levels (+ current) and the advertised slash commands. Sent on
+    /// connect (per session, in the initial burst) and again whenever any of
+    /// them changes. The phone replaces its whole config for the session.
+    Config {
+        session: SessionId,
+        config: SessionConfig,
+    },
+    /// Reply to `FsList`: the resolved directory, its parent (None at the root),
+    /// and its entries (dirs first, then files, each alphabetical).
+    FsEntries {
+        req: u64,
+        dir: String,
+        parent: Option<String>,
+        entries: Vec<FsEntry>,
+    },
+    /// Reply to `Upload`: the attachment's absolute path on the host.
+    UploadDone {
+        req: u64,
+        path: String,
+    },
+    /// A browse or upload failed; `req` correlates it to the request.
+    FsError {
+        req: u64,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,6 +117,13 @@ pub struct SessionMeta {
     pub title: String,
     pub state: SessionState,
     pub last_seq: Seq,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FsEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
 }
 
 #[cfg(test)]

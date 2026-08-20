@@ -24,6 +24,16 @@ mixin _$HostEventDto {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -33,6 +43,16 @@ mixin _$HostEventDto {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -42,6 +62,16 @@ mixin _$HostEventDto {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
@@ -53,6 +83,10 @@ mixin _$HostEventDto {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -63,6 +97,10 @@ mixin _$HostEventDto {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -72,6 +110,10 @@ mixin _$HostEventDto {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
@@ -186,6 +228,16 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return sessions(field0);
@@ -199,6 +251,16 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return sessions?.call(field0);
@@ -212,6 +274,16 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -230,6 +302,10 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return sessions(this);
@@ -244,6 +320,10 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return sessions?.call(this);
@@ -257,6 +337,10 @@ class _$HostEventDto_SessionsImpl extends HostEventDto_Sessions {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -359,6 +443,16 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return update(field0);
@@ -372,6 +466,16 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return update?.call(field0);
@@ -385,6 +489,16 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -403,6 +517,10 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return update(this);
@@ -417,6 +535,10 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return update?.call(this);
@@ -430,6 +552,10 @@ class _$HostEventDto_UpdateImpl extends HostEventDto_Update {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -542,6 +668,16 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return status(session, running);
@@ -555,6 +691,16 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return status?.call(session, running);
@@ -568,6 +714,16 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -586,6 +742,10 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return status(this);
@@ -600,6 +760,10 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return status?.call(this);
@@ -613,6 +777,10 @@ class _$HostEventDto_StatusImpl extends HostEventDto_Status {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -718,6 +886,16 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return permission(field0);
@@ -731,6 +909,16 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return permission?.call(field0);
@@ -744,6 +932,16 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -762,6 +960,10 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return permission(this);
@@ -776,6 +978,10 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return permission?.call(this);
@@ -789,6 +995,10 @@ class _$HostEventDto_PermissionImpl extends HostEventDto_Permission {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -905,6 +1115,16 @@ class _$HostEventDto_PermissionResolvedImpl
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return permissionResolved(session, id);
@@ -918,6 +1138,16 @@ class _$HostEventDto_PermissionResolvedImpl
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return permissionResolved?.call(session, id);
@@ -931,6 +1161,16 @@ class _$HostEventDto_PermissionResolvedImpl
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -949,6 +1189,10 @@ class _$HostEventDto_PermissionResolvedImpl
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return permissionResolved(this);
@@ -963,6 +1207,10 @@ class _$HostEventDto_PermissionResolvedImpl
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return permissionResolved?.call(this);
@@ -976,6 +1224,10 @@ class _$HostEventDto_PermissionResolvedImpl
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -1002,6 +1254,951 @@ abstract class HostEventDto_PermissionResolved extends HostEventDto {
   _$$HostEventDto_PermissionResolvedImplCopyWith<
     _$HostEventDto_PermissionResolvedImpl
   >
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HostEventDto_ConfigImplCopyWith<$Res> {
+  factory _$$HostEventDto_ConfigImplCopyWith(
+    _$HostEventDto_ConfigImpl value,
+    $Res Function(_$HostEventDto_ConfigImpl) then,
+  ) = __$$HostEventDto_ConfigImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String session, SessionConfigDto config});
+}
+
+/// @nodoc
+class __$$HostEventDto_ConfigImplCopyWithImpl<$Res>
+    extends _$HostEventDtoCopyWithImpl<$Res, _$HostEventDto_ConfigImpl>
+    implements _$$HostEventDto_ConfigImplCopyWith<$Res> {
+  __$$HostEventDto_ConfigImplCopyWithImpl(
+    _$HostEventDto_ConfigImpl _value,
+    $Res Function(_$HostEventDto_ConfigImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? session = null, Object? config = null}) {
+    return _then(
+      _$HostEventDto_ConfigImpl(
+        session: null == session
+            ? _value.session
+            : session // ignore: cast_nullable_to_non_nullable
+                  as String,
+        config: null == config
+            ? _value.config
+            : config // ignore: cast_nullable_to_non_nullable
+                  as SessionConfigDto,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$HostEventDto_ConfigImpl extends HostEventDto_Config {
+  const _$HostEventDto_ConfigImpl({required this.session, required this.config})
+    : super._();
+
+  @override
+  final String session;
+  @override
+  final SessionConfigDto config;
+
+  @override
+  String toString() {
+    return 'HostEventDto.config(session: $session, config: $config)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HostEventDto_ConfigImpl &&
+            (identical(other.session, session) || other.session == session) &&
+            (identical(other.config, config) || other.config == config));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, session, config);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HostEventDto_ConfigImplCopyWith<_$HostEventDto_ConfigImpl> get copyWith =>
+      __$$HostEventDto_ConfigImplCopyWithImpl<_$HostEventDto_ConfigImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(List<SessionMetaDto> field0) sessions,
+    required TResult Function(UpdateDto field0) update,
+    required TResult Function(String session, bool running) status,
+    required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
+    required TResult Function() disconnected,
+  }) {
+    return config(session, this.config);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(List<SessionMetaDto> field0)? sessions,
+    TResult? Function(UpdateDto field0)? update,
+    TResult? Function(String session, bool running)? status,
+    TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
+    TResult? Function()? disconnected,
+  }) {
+    return config?.call(session, this.config);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(List<SessionMetaDto> field0)? sessions,
+    TResult Function(UpdateDto field0)? update,
+    TResult Function(String session, bool running)? status,
+    TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
+    TResult Function()? disconnected,
+    required TResult orElse(),
+  }) {
+    if (config != null) {
+      return config(session, this.config);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HostEventDto_Sessions value) sessions,
+    required TResult Function(HostEventDto_Update value) update,
+    required TResult Function(HostEventDto_Status value) status,
+    required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
+    required TResult Function(HostEventDto_Disconnected value) disconnected,
+  }) {
+    return config(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HostEventDto_Sessions value)? sessions,
+    TResult? Function(HostEventDto_Update value)? update,
+    TResult? Function(HostEventDto_Status value)? status,
+    TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
+    TResult? Function(HostEventDto_Disconnected value)? disconnected,
+  }) {
+    return config?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HostEventDto_Sessions value)? sessions,
+    TResult Function(HostEventDto_Update value)? update,
+    TResult Function(HostEventDto_Status value)? status,
+    TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
+    TResult Function(HostEventDto_Disconnected value)? disconnected,
+    required TResult orElse(),
+  }) {
+    if (config != null) {
+      return config(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HostEventDto_Config extends HostEventDto {
+  const factory HostEventDto_Config({
+    required final String session,
+    required final SessionConfigDto config,
+  }) = _$HostEventDto_ConfigImpl;
+  const HostEventDto_Config._() : super._();
+
+  String get session;
+  SessionConfigDto get config;
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HostEventDto_ConfigImplCopyWith<_$HostEventDto_ConfigImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HostEventDto_FsEntriesImplCopyWith<$Res> {
+  factory _$$HostEventDto_FsEntriesImplCopyWith(
+    _$HostEventDto_FsEntriesImpl value,
+    $Res Function(_$HostEventDto_FsEntriesImpl) then,
+  ) = __$$HostEventDto_FsEntriesImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({BigInt req, String dir, String? parent, List<FsEntryDto> entries});
+}
+
+/// @nodoc
+class __$$HostEventDto_FsEntriesImplCopyWithImpl<$Res>
+    extends _$HostEventDtoCopyWithImpl<$Res, _$HostEventDto_FsEntriesImpl>
+    implements _$$HostEventDto_FsEntriesImplCopyWith<$Res> {
+  __$$HostEventDto_FsEntriesImplCopyWithImpl(
+    _$HostEventDto_FsEntriesImpl _value,
+    $Res Function(_$HostEventDto_FsEntriesImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? req = null,
+    Object? dir = null,
+    Object? parent = freezed,
+    Object? entries = null,
+  }) {
+    return _then(
+      _$HostEventDto_FsEntriesImpl(
+        req: null == req
+            ? _value.req
+            : req // ignore: cast_nullable_to_non_nullable
+                  as BigInt,
+        dir: null == dir
+            ? _value.dir
+            : dir // ignore: cast_nullable_to_non_nullable
+                  as String,
+        parent: freezed == parent
+            ? _value.parent
+            : parent // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        entries: null == entries
+            ? _value._entries
+            : entries // ignore: cast_nullable_to_non_nullable
+                  as List<FsEntryDto>,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$HostEventDto_FsEntriesImpl extends HostEventDto_FsEntries {
+  const _$HostEventDto_FsEntriesImpl({
+    required this.req,
+    required this.dir,
+    this.parent,
+    required final List<FsEntryDto> entries,
+  }) : _entries = entries,
+       super._();
+
+  @override
+  final BigInt req;
+  @override
+  final String dir;
+  @override
+  final String? parent;
+  final List<FsEntryDto> _entries;
+  @override
+  List<FsEntryDto> get entries {
+    if (_entries is EqualUnmodifiableListView) return _entries;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_entries);
+  }
+
+  @override
+  String toString() {
+    return 'HostEventDto.fsEntries(req: $req, dir: $dir, parent: $parent, entries: $entries)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HostEventDto_FsEntriesImpl &&
+            (identical(other.req, req) || other.req == req) &&
+            (identical(other.dir, dir) || other.dir == dir) &&
+            (identical(other.parent, parent) || other.parent == parent) &&
+            const DeepCollectionEquality().equals(other._entries, _entries));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    req,
+    dir,
+    parent,
+    const DeepCollectionEquality().hash(_entries),
+  );
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HostEventDto_FsEntriesImplCopyWith<_$HostEventDto_FsEntriesImpl>
+  get copyWith =>
+      __$$HostEventDto_FsEntriesImplCopyWithImpl<_$HostEventDto_FsEntriesImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(List<SessionMetaDto> field0) sessions,
+    required TResult Function(UpdateDto field0) update,
+    required TResult Function(String session, bool running) status,
+    required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
+    required TResult Function() disconnected,
+  }) {
+    return fsEntries(req, dir, parent, entries);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(List<SessionMetaDto> field0)? sessions,
+    TResult? Function(UpdateDto field0)? update,
+    TResult? Function(String session, bool running)? status,
+    TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
+    TResult? Function()? disconnected,
+  }) {
+    return fsEntries?.call(req, dir, parent, entries);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(List<SessionMetaDto> field0)? sessions,
+    TResult Function(UpdateDto field0)? update,
+    TResult Function(String session, bool running)? status,
+    TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
+    TResult Function()? disconnected,
+    required TResult orElse(),
+  }) {
+    if (fsEntries != null) {
+      return fsEntries(req, dir, parent, entries);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HostEventDto_Sessions value) sessions,
+    required TResult Function(HostEventDto_Update value) update,
+    required TResult Function(HostEventDto_Status value) status,
+    required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
+    required TResult Function(HostEventDto_Disconnected value) disconnected,
+  }) {
+    return fsEntries(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HostEventDto_Sessions value)? sessions,
+    TResult? Function(HostEventDto_Update value)? update,
+    TResult? Function(HostEventDto_Status value)? status,
+    TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
+    TResult? Function(HostEventDto_Disconnected value)? disconnected,
+  }) {
+    return fsEntries?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HostEventDto_Sessions value)? sessions,
+    TResult Function(HostEventDto_Update value)? update,
+    TResult Function(HostEventDto_Status value)? status,
+    TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
+    TResult Function(HostEventDto_Disconnected value)? disconnected,
+    required TResult orElse(),
+  }) {
+    if (fsEntries != null) {
+      return fsEntries(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HostEventDto_FsEntries extends HostEventDto {
+  const factory HostEventDto_FsEntries({
+    required final BigInt req,
+    required final String dir,
+    final String? parent,
+    required final List<FsEntryDto> entries,
+  }) = _$HostEventDto_FsEntriesImpl;
+  const HostEventDto_FsEntries._() : super._();
+
+  BigInt get req;
+  String get dir;
+  String? get parent;
+  List<FsEntryDto> get entries;
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HostEventDto_FsEntriesImplCopyWith<_$HostEventDto_FsEntriesImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HostEventDto_UploadDoneImplCopyWith<$Res> {
+  factory _$$HostEventDto_UploadDoneImplCopyWith(
+    _$HostEventDto_UploadDoneImpl value,
+    $Res Function(_$HostEventDto_UploadDoneImpl) then,
+  ) = __$$HostEventDto_UploadDoneImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({BigInt req, String path});
+}
+
+/// @nodoc
+class __$$HostEventDto_UploadDoneImplCopyWithImpl<$Res>
+    extends _$HostEventDtoCopyWithImpl<$Res, _$HostEventDto_UploadDoneImpl>
+    implements _$$HostEventDto_UploadDoneImplCopyWith<$Res> {
+  __$$HostEventDto_UploadDoneImplCopyWithImpl(
+    _$HostEventDto_UploadDoneImpl _value,
+    $Res Function(_$HostEventDto_UploadDoneImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? req = null, Object? path = null}) {
+    return _then(
+      _$HostEventDto_UploadDoneImpl(
+        req: null == req
+            ? _value.req
+            : req // ignore: cast_nullable_to_non_nullable
+                  as BigInt,
+        path: null == path
+            ? _value.path
+            : path // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$HostEventDto_UploadDoneImpl extends HostEventDto_UploadDone {
+  const _$HostEventDto_UploadDoneImpl({required this.req, required this.path})
+    : super._();
+
+  @override
+  final BigInt req;
+  @override
+  final String path;
+
+  @override
+  String toString() {
+    return 'HostEventDto.uploadDone(req: $req, path: $path)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HostEventDto_UploadDoneImpl &&
+            (identical(other.req, req) || other.req == req) &&
+            (identical(other.path, path) || other.path == path));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, req, path);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HostEventDto_UploadDoneImplCopyWith<_$HostEventDto_UploadDoneImpl>
+  get copyWith =>
+      __$$HostEventDto_UploadDoneImplCopyWithImpl<
+        _$HostEventDto_UploadDoneImpl
+      >(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(List<SessionMetaDto> field0) sessions,
+    required TResult Function(UpdateDto field0) update,
+    required TResult Function(String session, bool running) status,
+    required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
+    required TResult Function() disconnected,
+  }) {
+    return uploadDone(req, path);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(List<SessionMetaDto> field0)? sessions,
+    TResult? Function(UpdateDto field0)? update,
+    TResult? Function(String session, bool running)? status,
+    TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
+    TResult? Function()? disconnected,
+  }) {
+    return uploadDone?.call(req, path);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(List<SessionMetaDto> field0)? sessions,
+    TResult Function(UpdateDto field0)? update,
+    TResult Function(String session, bool running)? status,
+    TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
+    TResult Function()? disconnected,
+    required TResult orElse(),
+  }) {
+    if (uploadDone != null) {
+      return uploadDone(req, path);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HostEventDto_Sessions value) sessions,
+    required TResult Function(HostEventDto_Update value) update,
+    required TResult Function(HostEventDto_Status value) status,
+    required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
+    required TResult Function(HostEventDto_Disconnected value) disconnected,
+  }) {
+    return uploadDone(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HostEventDto_Sessions value)? sessions,
+    TResult? Function(HostEventDto_Update value)? update,
+    TResult? Function(HostEventDto_Status value)? status,
+    TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
+    TResult? Function(HostEventDto_Disconnected value)? disconnected,
+  }) {
+    return uploadDone?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HostEventDto_Sessions value)? sessions,
+    TResult Function(HostEventDto_Update value)? update,
+    TResult Function(HostEventDto_Status value)? status,
+    TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
+    TResult Function(HostEventDto_Disconnected value)? disconnected,
+    required TResult orElse(),
+  }) {
+    if (uploadDone != null) {
+      return uploadDone(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HostEventDto_UploadDone extends HostEventDto {
+  const factory HostEventDto_UploadDone({
+    required final BigInt req,
+    required final String path,
+  }) = _$HostEventDto_UploadDoneImpl;
+  const HostEventDto_UploadDone._() : super._();
+
+  BigInt get req;
+  String get path;
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HostEventDto_UploadDoneImplCopyWith<_$HostEventDto_UploadDoneImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HostEventDto_FsErrorImplCopyWith<$Res> {
+  factory _$$HostEventDto_FsErrorImplCopyWith(
+    _$HostEventDto_FsErrorImpl value,
+    $Res Function(_$HostEventDto_FsErrorImpl) then,
+  ) = __$$HostEventDto_FsErrorImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({BigInt req, String message});
+}
+
+/// @nodoc
+class __$$HostEventDto_FsErrorImplCopyWithImpl<$Res>
+    extends _$HostEventDtoCopyWithImpl<$Res, _$HostEventDto_FsErrorImpl>
+    implements _$$HostEventDto_FsErrorImplCopyWith<$Res> {
+  __$$HostEventDto_FsErrorImplCopyWithImpl(
+    _$HostEventDto_FsErrorImpl _value,
+    $Res Function(_$HostEventDto_FsErrorImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? req = null, Object? message = null}) {
+    return _then(
+      _$HostEventDto_FsErrorImpl(
+        req: null == req
+            ? _value.req
+            : req // ignore: cast_nullable_to_non_nullable
+                  as BigInt,
+        message: null == message
+            ? _value.message
+            : message // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$HostEventDto_FsErrorImpl extends HostEventDto_FsError {
+  const _$HostEventDto_FsErrorImpl({required this.req, required this.message})
+    : super._();
+
+  @override
+  final BigInt req;
+  @override
+  final String message;
+
+  @override
+  String toString() {
+    return 'HostEventDto.fsError(req: $req, message: $message)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HostEventDto_FsErrorImpl &&
+            (identical(other.req, req) || other.req == req) &&
+            (identical(other.message, message) || other.message == message));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, req, message);
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HostEventDto_FsErrorImplCopyWith<_$HostEventDto_FsErrorImpl>
+  get copyWith =>
+      __$$HostEventDto_FsErrorImplCopyWithImpl<_$HostEventDto_FsErrorImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(List<SessionMetaDto> field0) sessions,
+    required TResult Function(UpdateDto field0) update,
+    required TResult Function(String session, bool running) status,
+    required TResult Function(PermissionReqDto field0) permission,
+    required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
+    required TResult Function() disconnected,
+  }) {
+    return fsError(req, message);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(List<SessionMetaDto> field0)? sessions,
+    TResult? Function(UpdateDto field0)? update,
+    TResult? Function(String session, bool running)? status,
+    TResult? Function(PermissionReqDto field0)? permission,
+    TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
+    TResult? Function()? disconnected,
+  }) {
+    return fsError?.call(req, message);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(List<SessionMetaDto> field0)? sessions,
+    TResult Function(UpdateDto field0)? update,
+    TResult Function(String session, bool running)? status,
+    TResult Function(PermissionReqDto field0)? permission,
+    TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
+    TResult Function()? disconnected,
+    required TResult orElse(),
+  }) {
+    if (fsError != null) {
+      return fsError(req, message);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HostEventDto_Sessions value) sessions,
+    required TResult Function(HostEventDto_Update value) update,
+    required TResult Function(HostEventDto_Status value) status,
+    required TResult Function(HostEventDto_Permission value) permission,
+    required TResult Function(HostEventDto_PermissionResolved value)
+    permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
+    required TResult Function(HostEventDto_Disconnected value) disconnected,
+  }) {
+    return fsError(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HostEventDto_Sessions value)? sessions,
+    TResult? Function(HostEventDto_Update value)? update,
+    TResult? Function(HostEventDto_Status value)? status,
+    TResult? Function(HostEventDto_Permission value)? permission,
+    TResult? Function(HostEventDto_PermissionResolved value)?
+    permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
+    TResult? Function(HostEventDto_Disconnected value)? disconnected,
+  }) {
+    return fsError?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HostEventDto_Sessions value)? sessions,
+    TResult Function(HostEventDto_Update value)? update,
+    TResult Function(HostEventDto_Status value)? status,
+    TResult Function(HostEventDto_Permission value)? permission,
+    TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
+    TResult Function(HostEventDto_Disconnected value)? disconnected,
+    required TResult orElse(),
+  }) {
+    if (fsError != null) {
+      return fsError(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HostEventDto_FsError extends HostEventDto {
+  const factory HostEventDto_FsError({
+    required final BigInt req,
+    required final String message,
+  }) = _$HostEventDto_FsErrorImpl;
+  const HostEventDto_FsError._() : super._();
+
+  BigInt get req;
+  String get message;
+
+  /// Create a copy of HostEventDto
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HostEventDto_FsErrorImplCopyWith<_$HostEventDto_FsErrorImpl>
   get copyWith => throw _privateConstructorUsedError;
 }
 
@@ -1054,6 +2251,16 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     required TResult Function(String session, bool running) status,
     required TResult Function(PermissionReqDto field0) permission,
     required TResult Function(String session, String id) permissionResolved,
+    required TResult Function(String session, SessionConfigDto config) config,
+    required TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )
+    fsEntries,
+    required TResult Function(BigInt req, String path) uploadDone,
+    required TResult Function(BigInt req, String message) fsError,
     required TResult Function() disconnected,
   }) {
     return disconnected();
@@ -1067,6 +2274,16 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult? Function(String session, bool running)? status,
     TResult? Function(PermissionReqDto field0)? permission,
     TResult? Function(String session, String id)? permissionResolved,
+    TResult? Function(String session, SessionConfigDto config)? config,
+    TResult? Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult? Function(BigInt req, String path)? uploadDone,
+    TResult? Function(BigInt req, String message)? fsError,
     TResult? Function()? disconnected,
   }) {
     return disconnected?.call();
@@ -1080,6 +2297,16 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult Function(String session, bool running)? status,
     TResult Function(PermissionReqDto field0)? permission,
     TResult Function(String session, String id)? permissionResolved,
+    TResult Function(String session, SessionConfigDto config)? config,
+    TResult Function(
+      BigInt req,
+      String dir,
+      String? parent,
+      List<FsEntryDto> entries,
+    )?
+    fsEntries,
+    TResult Function(BigInt req, String path)? uploadDone,
+    TResult Function(BigInt req, String message)? fsError,
     TResult Function()? disconnected,
     required TResult orElse(),
   }) {
@@ -1098,6 +2325,10 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     required TResult Function(HostEventDto_Permission value) permission,
     required TResult Function(HostEventDto_PermissionResolved value)
     permissionResolved,
+    required TResult Function(HostEventDto_Config value) config,
+    required TResult Function(HostEventDto_FsEntries value) fsEntries,
+    required TResult Function(HostEventDto_UploadDone value) uploadDone,
+    required TResult Function(HostEventDto_FsError value) fsError,
     required TResult Function(HostEventDto_Disconnected value) disconnected,
   }) {
     return disconnected(this);
@@ -1112,6 +2343,10 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult? Function(HostEventDto_Permission value)? permission,
     TResult? Function(HostEventDto_PermissionResolved value)?
     permissionResolved,
+    TResult? Function(HostEventDto_Config value)? config,
+    TResult? Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult? Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult? Function(HostEventDto_FsError value)? fsError,
     TResult? Function(HostEventDto_Disconnected value)? disconnected,
   }) {
     return disconnected?.call(this);
@@ -1125,6 +2360,10 @@ class _$HostEventDto_DisconnectedImpl extends HostEventDto_Disconnected {
     TResult Function(HostEventDto_Status value)? status,
     TResult Function(HostEventDto_Permission value)? permission,
     TResult Function(HostEventDto_PermissionResolved value)? permissionResolved,
+    TResult Function(HostEventDto_Config value)? config,
+    TResult Function(HostEventDto_FsEntries value)? fsEntries,
+    TResult Function(HostEventDto_UploadDone value)? uploadDone,
+    TResult Function(HostEventDto_FsError value)? fsError,
     TResult Function(HostEventDto_Disconnected value)? disconnected,
     required TResult orElse(),
   }) {
@@ -1163,7 +2402,7 @@ mixin _$PayloadDto {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -1183,7 +2422,7 @@ mixin _$PayloadDto {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -1203,7 +2442,7 @@ mixin _$PayloadDto {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
@@ -1354,7 +2593,7 @@ class _$PayloadDto_AgentMessageImpl extends PayloadDto_AgentMessage {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return agentMessage(text);
@@ -1378,7 +2617,7 @@ class _$PayloadDto_AgentMessageImpl extends PayloadDto_AgentMessage {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return agentMessage?.call(text);
@@ -1402,7 +2641,7 @@ class _$PayloadDto_AgentMessageImpl extends PayloadDto_AgentMessage {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -1565,7 +2804,7 @@ class _$PayloadDto_ThoughtImpl extends PayloadDto_Thought {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return thought(text);
@@ -1589,7 +2828,7 @@ class _$PayloadDto_ThoughtImpl extends PayloadDto_Thought {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return thought?.call(text);
@@ -1613,7 +2852,7 @@ class _$PayloadDto_ThoughtImpl extends PayloadDto_Thought {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -1777,7 +3016,7 @@ class _$PayloadDto_UserMessageImpl extends PayloadDto_UserMessage {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return userMessage(text);
@@ -1801,7 +3040,7 @@ class _$PayloadDto_UserMessageImpl extends PayloadDto_UserMessage {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return userMessage?.call(text);
@@ -1825,7 +3064,7 @@ class _$PayloadDto_UserMessageImpl extends PayloadDto_UserMessage {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -2079,7 +3318,7 @@ class _$PayloadDto_ToolCallImpl extends PayloadDto_ToolCall {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return toolCall(id, kind, title, command, status, content, locations);
@@ -2103,7 +3342,7 @@ class _$PayloadDto_ToolCallImpl extends PayloadDto_ToolCall {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return toolCall?.call(id, kind, title, command, status, content, locations);
@@ -2127,7 +3366,7 @@ class _$PayloadDto_ToolCallImpl extends PayloadDto_ToolCall {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -2336,7 +3575,7 @@ class _$PayloadDto_ToolCallUpdateImpl extends PayloadDto_ToolCallUpdate {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return toolCallUpdate(id, status, content);
@@ -2360,7 +3599,7 @@ class _$PayloadDto_ToolCallUpdateImpl extends PayloadDto_ToolCallUpdate {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return toolCallUpdate?.call(id, status, content);
@@ -2384,7 +3623,7 @@ class _$PayloadDto_ToolCallUpdateImpl extends PayloadDto_ToolCallUpdate {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -2467,7 +3706,7 @@ abstract class _$$PayloadDto_PlanImplCopyWith<$Res> {
     $Res Function(_$PayloadDto_PlanImpl) then,
   ) = __$$PayloadDto_PlanImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({List<String> entries});
+  $Res call({List<PlanEntryDto> entries});
 }
 
 /// @nodoc
@@ -2489,7 +3728,7 @@ class __$$PayloadDto_PlanImplCopyWithImpl<$Res>
         entries: null == entries
             ? _value._entries
             : entries // ignore: cast_nullable_to_non_nullable
-                  as List<String>,
+                  as List<PlanEntryDto>,
       ),
     );
   }
@@ -2498,13 +3737,13 @@ class __$$PayloadDto_PlanImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$PayloadDto_PlanImpl extends PayloadDto_Plan {
-  const _$PayloadDto_PlanImpl({required final List<String> entries})
+  const _$PayloadDto_PlanImpl({required final List<PlanEntryDto> entries})
     : _entries = entries,
       super._();
 
-  final List<String> _entries;
+  final List<PlanEntryDto> _entries;
   @override
-  List<String> get entries {
+  List<PlanEntryDto> get entries {
     if (_entries is EqualUnmodifiableListView) return _entries;
     // ignore: implicit_dynamic_type
     return EqualUnmodifiableListView(_entries);
@@ -2560,7 +3799,7 @@ class _$PayloadDto_PlanImpl extends PayloadDto_Plan {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return plan(entries);
@@ -2584,7 +3823,7 @@ class _$PayloadDto_PlanImpl extends PayloadDto_Plan {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return plan?.call(entries);
@@ -2608,7 +3847,7 @@ class _$PayloadDto_PlanImpl extends PayloadDto_Plan {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {
@@ -2666,11 +3905,11 @@ class _$PayloadDto_PlanImpl extends PayloadDto_Plan {
 }
 
 abstract class PayloadDto_Plan extends PayloadDto {
-  const factory PayloadDto_Plan({required final List<String> entries}) =
+  const factory PayloadDto_Plan({required final List<PlanEntryDto> entries}) =
       _$PayloadDto_PlanImpl;
   const PayloadDto_Plan._() : super._();
 
-  List<String> get entries;
+  List<PlanEntryDto> get entries;
 
   /// Create a copy of PayloadDto
   /// with the given fields replaced by the non-null parameter values.
@@ -2779,7 +4018,7 @@ class _$PayloadDto_UsageImpl extends PayloadDto_Usage {
       List<ContentDto> content,
     )
     toolCallUpdate,
-    required TResult Function(List<String> entries) plan,
+    required TResult Function(List<PlanEntryDto> entries) plan,
     required TResult Function(BigInt input, BigInt output) usage,
   }) {
     return usage(input, output);
@@ -2803,7 +4042,7 @@ class _$PayloadDto_UsageImpl extends PayloadDto_Usage {
     toolCall,
     TResult? Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult? Function(List<String> entries)? plan,
+    TResult? Function(List<PlanEntryDto> entries)? plan,
     TResult? Function(BigInt input, BigInt output)? usage,
   }) {
     return usage?.call(input, output);
@@ -2827,7 +4066,7 @@ class _$PayloadDto_UsageImpl extends PayloadDto_Usage {
     toolCall,
     TResult Function(String id, String status, List<ContentDto> content)?
     toolCallUpdate,
-    TResult Function(List<String> entries)? plan,
+    TResult Function(List<PlanEntryDto> entries)? plan,
     TResult Function(BigInt input, BigInt output)? usage,
     required TResult orElse(),
   }) {

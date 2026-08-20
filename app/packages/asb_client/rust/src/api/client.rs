@@ -9,7 +9,9 @@
 use std::path::Path;
 
 use asb_protocol::client::{PhoneReceiver, PhoneSender};
-use asb_protocol::model::{Content, Payload, Update};
+use asb_protocol::model::{
+    CommandInfo, ConfigOption, Content, Payload, PlanEntry, PlanStatus, SessionConfig, Update,
+};
 use asb_protocol::wire::{SessionMeta, WireMsg};
 use flutter_rust_bridge::frb;
 // `StreamSink` is generated per-crate by frb's `frb_generated_stream_sink!`
@@ -145,6 +147,43 @@ impl RustSession {
     pub async fn interrupt(&self, session: String) -> anyhow::Result<()> {
         self.sender.lock().await.interrupt(&session).await
     }
+
+    /// Send a slash command (e.g. `/model`, `/mode`, `/thought`, `/compact`) to
+    /// the host. `arg` is the value for setters like `/model <id>`.
+    pub async fn command(
+        &self,
+        session: String,
+        name: String,
+        arg: Option<String>,
+    ) -> anyhow::Result<()> {
+        self.sender.lock().await.command(&session, &name, arg).await
+    }
+
+    /// Browse the HOST filesystem. `path` None starts at home. The reply arrives
+    /// on the event stream as `HostEventDto::FsEntries` (or `FsError`), matched
+    /// by `req`.
+    pub async fn fs_list(&self, req: u64, path: Option<String>) -> anyhow::Result<()> {
+        self.sender.lock().await.fs_list(req, path).await
+    }
+
+    /// Begin a chunked attachment upload. Bytes follow via [`upload_chunk`];
+    /// [`upload_finish`] seals it and the landed path returns as
+    /// `HostEventDto::UploadDone`. Streaming keeps every frame small and the
+    /// phone's working set to one chunk.
+    pub async fn upload_start(&self, req: u64, name: String) -> anyhow::Result<()> {
+        self.sender.lock().await.upload_start(req, &name).await
+    }
+
+    /// Send one raw byte slice of the upload under `req` (Dart passes a
+    /// `Uint8List`; no base64 on the wire).
+    pub async fn upload_chunk(&self, req: u64, data: Vec<u8>) -> anyhow::Result<()> {
+        self.sender.lock().await.upload_chunk(req, &data).await
+    }
+
+    /// Seal the upload under `req`; the host replies `UploadDone` with the path.
+    pub async fn upload_finish(&self, req: u64) -> anyhow::Result<()> {
+        self.sender.lock().await.upload_finish(req).await
+    }
 }
 
 /// A per-session catch-up high-water mark passed to `hello`.
@@ -160,7 +199,47 @@ pub enum HostEventDto {
     Status { session: String, running: bool },
     Permission(PermissionReqDto),
     PermissionResolved { session: String, id: String },
+    Config { session: String, config: SessionConfigDto },
+    /// Reply to `fs_list`, matched by `req`.
+    FsEntries {
+        req: u64,
+        dir: String,
+        parent: Option<String>,
+        entries: Vec<FsEntryDto>,
+    },
+    /// Reply to `upload`, matched by `req`: the attachment's host path.
+    UploadDone { req: u64, path: String },
+    /// A browse or upload failed, matched by `req`.
+    FsError { req: u64, message: String },
     Disconnected,
+}
+
+pub struct FsEntryDto {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+}
+
+/// A session's backend knobs, flattened for Dart.
+pub struct SessionConfigDto {
+    pub models: Vec<ConfigOptionDto>,
+    pub current_model: Option<String>,
+    pub modes: Vec<ConfigOptionDto>,
+    pub current_mode: Option<String>,
+    pub thought_levels: Vec<ConfigOptionDto>,
+    pub current_thought: Option<String>,
+    pub commands: Vec<CommandInfoDto>,
+}
+
+pub struct ConfigOptionDto {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+}
+
+pub struct CommandInfoDto {
+    pub name: String,
+    pub description: Option<String>,
 }
 
 pub struct SessionMetaDto {
@@ -202,12 +281,18 @@ pub enum PayloadDto {
         content: Vec<ContentDto>,
     },
     Plan {
-        entries: Vec<String>,
+        entries: Vec<PlanEntryDto>,
     },
     Usage {
         input: u64,
         output: u64,
     },
+}
+
+pub struct PlanEntryDto {
+    pub content: String,
+    /// `"pending"` | `"in_progress"` | `"completed"`.
+    pub status: String,
 }
 
 /// One content block: `kind` is `"text"`/`"diff"`/`"file_ref"` and only the
@@ -261,8 +346,51 @@ fn map_event(m: WireMsg) -> HostEventDto {
         WireMsg::PermissionResolved { session, id } => {
             HostEventDto::PermissionResolved { session, id }
         }
+        WireMsg::Config { session, config } => HostEventDto::Config {
+            session,
+            config: map_config(config),
+        },
+        WireMsg::FsEntries { req, dir, parent, entries } => HostEventDto::FsEntries {
+            req,
+            dir,
+            parent,
+            entries: entries
+                .into_iter()
+                .map(|e| FsEntryDto {
+                    name: e.name,
+                    path: e.path,
+                    is_dir: e.is_dir,
+                })
+                .collect(),
+        },
+        WireMsg::UploadDone { req, path } => HostEventDto::UploadDone { req, path },
+        WireMsg::FsError { req, message } => HostEventDto::FsError { req, message },
         // phone -> host variants never arrive here.
         _ => HostEventDto::Disconnected,
+    }
+}
+
+fn map_config(c: SessionConfig) -> SessionConfigDto {
+    let opt = |o: ConfigOption| ConfigOptionDto {
+        id: o.id,
+        name: o.name,
+        description: o.description,
+    };
+    SessionConfigDto {
+        models: c.models.into_iter().map(opt).collect(),
+        current_model: c.current_model,
+        modes: c.modes.into_iter().map(opt).collect(),
+        current_mode: c.current_mode,
+        thought_levels: c.thought_levels.into_iter().map(opt).collect(),
+        current_thought: c.current_thought,
+        commands: c
+            .commands
+            .into_iter()
+            .map(|c: CommandInfo| CommandInfoDto {
+                name: c.name,
+                description: c.description,
+            })
+            .collect(),
     }
 }
 
@@ -328,8 +456,22 @@ fn map_payload(p: Payload) -> PayloadDto {
             status: status_str(status),
             content: content.into_iter().map(map_content).collect(),
         },
-        Payload::Plan { entries } => PayloadDto::Plan { entries },
+        Payload::Plan { entries } => PayloadDto::Plan {
+            entries: entries.into_iter().map(map_plan_entry).collect(),
+        },
         Payload::Usage { input, output } => PayloadDto::Usage { input, output },
+    }
+}
+
+fn map_plan_entry(e: PlanEntry) -> PlanEntryDto {
+    PlanEntryDto {
+        content: e.content,
+        status: match e.status {
+            PlanStatus::Pending => "pending",
+            PlanStatus::InProgress => "in_progress",
+            PlanStatus::Completed => "completed",
+        }
+        .to_string(),
     }
 }
 

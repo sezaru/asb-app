@@ -82,10 +82,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PermissionReqDto dco_decode_box_autoadd_permission_req_dto(dynamic raw);
 
   @protected
+  SessionConfigDto dco_decode_box_autoadd_session_config_dto(dynamic raw);
+
+  @protected
   UpdateDto dco_decode_box_autoadd_update_dto(dynamic raw);
 
   @protected
+  CommandInfoDto dco_decode_command_info_dto(dynamic raw);
+
+  @protected
+  ConfigOptionDto dco_decode_config_option_dto(dynamic raw);
+
+  @protected
   ContentDto dco_decode_content_dto(dynamic raw);
+
+  @protected
+  FsEntryDto dco_decode_fs_entry_dto(dynamic raw);
 
   @protected
   HighWaterDto dco_decode_high_water_dto(dynamic raw);
@@ -97,13 +109,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<CommandInfoDto> dco_decode_list_command_info_dto(dynamic raw);
+
+  @protected
+  List<ConfigOptionDto> dco_decode_list_config_option_dto(dynamic raw);
+
+  @protected
   List<ContentDto> dco_decode_list_content_dto(dynamic raw);
+
+  @protected
+  List<FsEntryDto> dco_decode_list_fs_entry_dto(dynamic raw);
 
   @protected
   List<HighWaterDto> dco_decode_list_high_water_dto(dynamic raw);
 
   @protected
   List<PermOptionDto> dco_decode_list_perm_option_dto(dynamic raw);
+
+  @protected
+  List<PlanEntryDto> dco_decode_list_plan_entry_dto(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -122,6 +146,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PermissionReqDto dco_decode_permission_req_dto(dynamic raw);
+
+  @protected
+  PlanEntryDto dco_decode_plan_entry_dto(dynamic raw);
+
+  @protected
+  SessionConfigDto dco_decode_session_config_dto(dynamic raw);
 
   @protected
   SessionMetaDto dco_decode_session_meta_dto(dynamic raw);
@@ -197,10 +227,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  SessionConfigDto sse_decode_box_autoadd_session_config_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   UpdateDto sse_decode_box_autoadd_update_dto(SseDeserializer deserializer);
 
   @protected
+  CommandInfoDto sse_decode_command_info_dto(SseDeserializer deserializer);
+
+  @protected
+  ConfigOptionDto sse_decode_config_option_dto(SseDeserializer deserializer);
+
+  @protected
   ContentDto sse_decode_content_dto(SseDeserializer deserializer);
+
+  @protected
+  FsEntryDto sse_decode_fs_entry_dto(SseDeserializer deserializer);
 
   @protected
   HighWaterDto sse_decode_high_water_dto(SseDeserializer deserializer);
@@ -212,7 +256,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<CommandInfoDto> sse_decode_list_command_info_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ConfigOptionDto> sse_decode_list_config_option_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ContentDto> sse_decode_list_content_dto(SseDeserializer deserializer);
+
+  @protected
+  List<FsEntryDto> sse_decode_list_fs_entry_dto(SseDeserializer deserializer);
 
   @protected
   List<HighWaterDto> sse_decode_list_high_water_dto(
@@ -221,6 +278,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<PermOptionDto> sse_decode_list_perm_option_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PlanEntryDto> sse_decode_list_plan_entry_dto(
     SseDeserializer deserializer,
   );
 
@@ -243,6 +305,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PermissionReqDto sse_decode_permission_req_dto(SseDeserializer deserializer);
+
+  @protected
+  PlanEntryDto sse_decode_plan_entry_dto(SseDeserializer deserializer);
+
+  @protected
+  SessionConfigDto sse_decode_session_config_dto(SseDeserializer deserializer);
 
   @protected
   SessionMetaDto sse_decode_session_meta_dto(SseDeserializer deserializer);
@@ -332,13 +400,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_session_config_dto(
+    SessionConfigDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_update_dto(
     UpdateDto self,
     SseSerializer serializer,
   );
 
   @protected
+  void sse_encode_command_info_dto(
+    CommandInfoDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_config_option_dto(
+    ConfigOptionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_content_dto(ContentDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_fs_entry_dto(FsEntryDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_high_water_dto(HighWaterDto self, SseSerializer serializer);
@@ -350,8 +439,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_command_info_dto(
+    List<CommandInfoDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_config_option_dto(
+    List<ConfigOptionDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_content_dto(
     List<ContentDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_fs_entry_dto(
+    List<FsEntryDto> self,
     SseSerializer serializer,
   );
 
@@ -364,6 +471,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_perm_option_dto(
     List<PermOptionDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_plan_entry_dto(
+    List<PlanEntryDto> self,
     SseSerializer serializer,
   );
 
@@ -391,6 +504,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_permission_req_dto(
     PermissionReqDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_plan_entry_dto(PlanEntryDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_session_config_dto(
+    SessionConfigDto self,
     SseSerializer serializer,
   );
 

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::model::{Payload, SessionId, SessionState, Seq, TurnId};
+use crate::model::{Payload, SessionConfig, SessionId, SessionState, Seq, TurnId};
 
 /// Provider (Emacs) -> sidecar, one JSON object per line over the unix socket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +34,14 @@ pub enum EmacsIn {
     },
     SessionClose {
         session: SessionId,
+    },
+    /// The session's live knobs (models / modes / thinking levels + current) and
+    /// advertised slash commands, read from agent-shell state. Sent at
+    /// session-open and whenever agent-shell reports a change; the sidecar stores
+    /// the latest and mirrors it to phones as `WireMsg::Config`.
+    Config {
+        session: SessionId,
+        config: SessionConfig,
     },
     /// Synchronous resume gate: reserve SESSION before agent-shell opens the
     /// buffer, so the same session cannot be resumed in two buffers/instances
