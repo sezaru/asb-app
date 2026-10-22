@@ -16,9 +16,26 @@
         "type": "github"
       }
     },
+    "roam": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787376395,
+        "narHash": "sha256-c/e5ZQ9WjbBSaz0ZIQWYa/MzhAOrva4LPTCIMxCOOms=",
+        "owner": "Hexhound",
+        "repo": "roam",
+        "rev": "3cbdb2139bb897c0b04370ad67e3275988fd616c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Hexhound",
+        "repo": "roam",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "roam": "roam"
       }
     }
   },
