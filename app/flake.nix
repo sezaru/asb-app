@@ -2,7 +2,7 @@
   description = "asb-app Flutter client";
 
   inputs = {
-    devenv.url = "github:cachix/devenv";
+    devenv.follows = "devkit/devenv";
 
     nixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-25.11";
